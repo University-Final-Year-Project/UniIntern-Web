@@ -27,6 +27,8 @@ import PostJobPage from './pages/company/PostJobPage';
 import EditJobPage from './pages/company/EditJobPage';
 import ReviewApplicantsPage from './pages/company/ReviewApplicantsPage';
 import CompanyProfilePage from './pages/company/CompanyProfilePage';
+import CompanyLayout from './components/common/CompanyLayout';
+import CompanyDashboardPage from './pages/company/CompanyDashboardPage';
 
 // Admin pages
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
@@ -78,14 +80,16 @@ function App() {
 
       {/* Company routes */}
       {user?.role === 'COMPANY' && (
-        <>
-          <Route path="/" element={<CompanyJobsPage />} />
+        <Route element={<CompanyLayout />}>
+          <Route path="/" element={<CompanyDashboardPage />} />
+          <Route path="/listings" element={<CompanyJobsPage />} />
           <Route path="/post-job" element={<PostJobPage />} />
           <Route path="/jobs/:jobId/edit" element={<EditJobPage />} />
+          <Route path="/candidates" element={<ReviewApplicantsPage />} />
           <Route path="/jobs/:jobId/applicants" element={<ReviewApplicantsPage />} />
-          <Route path="/profile" element={<CompanyProfilePage />} />
+          <Route path="/settings" element={<CompanyProfilePage />} />
           <Route path="*" element={<Navigate to="/" />} />
-        </>
+        </Route>
       )}
 
       {/* Admin routes */}
