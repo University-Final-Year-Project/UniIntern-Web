@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Briefcase, MapPin, Image as ImageIcon, Calendar, Send } from 'lucide-react';
 import api from '../../services/api';
 
 const jobTypes = ['FULL_TIME', 'PART_TIME', 'REMOTE', 'HYBRID'];
@@ -86,7 +87,7 @@ const PostJobPage = () => {
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <div className="w-10 h-10 bg-navy rounded-xl flex items-center justify-center">
-          <span className="text-white text-lg">💼</span>
+          <Briefcase className="w-5 h-5 text-white" />
         </div>
         <div>
           <h1 className="text-2xl font-bold text-navy">Post New Internship</h1>
@@ -147,7 +148,7 @@ const PostJobPage = () => {
                   Location
                 </label>
                 <div className="flex items-center border border-gray-200 rounded-xl px-4 py-3 gap-2 bg-gray-50 focus-within:border-navy focus-within:bg-white transition-colors">
-                  <span className="text-gray-400 text-sm">📍</span>
+                  <MapPin className="w-4 h-4 text-gray-400" />
                   <input
                     type="text"
                     placeholder="San Francisco, CA"
@@ -337,7 +338,7 @@ const PostJobPage = () => {
                   Hero Image URL
                 </label>
                 <div className="flex items-center border border-gray-200 rounded-xl px-4 py-3 gap-2 bg-gray-50 focus-within:border-navy focus-within:bg-white transition-colors">
-                  <span className="text-gray-400 text-sm">🖼</span>
+                  <ImageIcon className="w-4 h-4 text-gray-400" />
                   <input
                     type="url"
                     placeholder="https://..."
@@ -352,7 +353,7 @@ const PostJobPage = () => {
                   Application Deadline
                 </label>
                 <div className="flex items-center border border-gray-200 rounded-xl px-4 py-3 gap-2 bg-gray-50 focus-within:border-navy focus-within:bg-white transition-colors">
-                  <span className="text-gray-400 text-sm">📅</span>
+                  <Calendar className="w-4 h-4 text-gray-400" />
                   <input
                     type="date"
                     className="flex-1 text-sm text-navy bg-transparent focus:outline-none"
@@ -370,7 +371,14 @@ const PostJobPage = () => {
           type="submit"
           disabled={isLoading}
           className="w-full bg-navy text-white font-bold py-4 rounded-xl hover:bg-navy-light transition-colors text-sm disabled:opacity-70 flex items-center justify-center gap-2 mb-3">
-          {isLoading ? 'Posting...' : 'Post Internship ➤'}
+          {isLoading ? (
+            'Posting...'
+          ) : (
+            <>
+              Post Internship
+              <Send className="w-4 h-4" />
+            </>
+          )}
         </button>
         <button
           type="button"
