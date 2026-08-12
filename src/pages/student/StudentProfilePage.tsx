@@ -59,6 +59,14 @@ const StudentProfilePage = () => {
   const profile = user?.studentProfile as any;
   const [documents, setDocuments] = useState<Document[]>([]);
 
+  const [experiences, setExperiences] = useState<{ title: string; description: string }[]>([]);
+  const [interests, setInterests] = useState<string[]>([]);
+  const [showExpModal, setShowExpModal] = useState(false);
+  const [showInterestModal, setShowInterestModal] = useState(false);
+  const [expTitle, setExpTitle] = useState('');
+  const [expDesc, setExpDesc] = useState('');
+  const [interestInput, setInterestInput] = useState('');
+
   useEffect(() => {
     api.get('/documents').then((res) => setDocuments(res.data.data ?? []));
   }, []);
@@ -104,9 +112,9 @@ const StudentProfilePage = () => {
                 <div className="px-6 pb-6">
                   <div className="flex items-end gap-4 -mt-10 mb-4">
                     <div className="relative flex-shrink-0">
-                      <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center overflow-hidden">
+                      <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center overflow-hidden" style={{ aspectRatio: '1/1' }}>
                         {profile?.avatarUrl ? (
-                          <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                          <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
                         ) : (
                           <div className="w-full h-full bg-gray-100 flex items-center justify-center">
                             <span className="text-navy text-2xl font-bold">
@@ -296,29 +304,87 @@ const StudentProfilePage = () => {
 
               {/* Experience & Interests */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm text-center">
-                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <Briefcase className="w-6 h-6 text-navy" />
+                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-navy" />
+                      <h3 className="text-sm font-bold text-navy">Experience & Projects</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowExpModal(true)}
+                      className="text-gray-300 hover:text-navy transition-colors">
+                      <Plus className="w-4 h-4" />
+                    </button>
                   </div>
-                  <h3 className="text-sm font-bold text-navy mb-1">Experience & Projects</h3>
-                  <p className="text-xs text-gray-400 mb-4 leading-5">
-                    Showcase your past roles, hackathons, or personal projects.
-                  </p>
-                  <button className="flex items-center gap-1.5 text-xs text-navy font-semibold mx-auto hover:text-teal transition-colors">
-                    <Plus className="w-4 h-4 text-teal" /> Add Entry
-                  </button>
-                </div>
-                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm text-center">
-                  <div className="w-12 h-12 bg-teal-light rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <Target className="w-6 h-6 text-teal" />
+                  {experiences.length === 0 ? (
+                    <div className="text-center py-4">
+                      <p className="text-xs text-gray-400 mb-3 leading-5">
+                        Showcase your past roles, hackathons, or personal projects.
+                      </p>
+                      <button
+                        onClick={() => setShowExpModal(true)}
+                        className="flex items-center gap-1.5 text-xs text-teal font-semibold mx-auto hover:underline">
+                        <Plus className="w-4 h-4" /> Add Entry
+                      </button>
+                    </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {experiences.map((exp, i) => (
+                          <div key={i} className="bg-gray-50 rounded-xl p-3">
+                            <p className="text-xs font-bold text-navy">{exp.title}</p>
+                            <p className="text-xs text-gray-400 mt-1">{exp.description}</p>
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => setShowExpModal(true)}
+                          className="flex items-center gap-1 text-xs text-teal font-semibold hover:underline">
+                          <Plus className="w-3 h-3" /> Add another
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <h3 className="text-sm font-bold text-navy mb-1">Internship Interests</h3>
-                  <p className="text-xs text-gray-400 mb-4 leading-5">
-                    Let recruiters know what roles and industries you're targeting.
-                  </p>
-                  <button className="flex items-center gap-1.5 text-xs text-teal font-semibold mx-auto hover:underline">
-                    <Plus className="w-4 h-4" /> Add Interests
-                  </button>
+                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-4 h-4 text-teal" />
+                      <h3 className="text-sm font-bold text-navy">Internship Interests</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowInterestModal(true)}
+                      className="text-gray-300 hover:text-navy transition-colors">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {interests.length === 0 ? (
+                    <div className="text-center py-4">
+                      <p className="text-xs text-gray-400 mb-3 leading-5">
+                        Let recruiters know what roles and industries you're targeting.
+                      </p>
+                      <button
+                        onClick={() => setShowInterestModal(true)}
+                        className="flex items-center gap-1.5 text-xs text-teal font-semibold mx-auto hover:underline">
+                        <Plus className="w-4 h-4" /> Add Interests
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {interests.map((interest, i) => (
+                        <span key={i} className="bg-teal-light text-teal-dark text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
+                          {interest}
+                          <button
+                            onClick={() => setInterests(interests.filter((_, idx) => idx !== i))}
+                            className="hover:text-red-500 transition-colors ml-1">
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <button
+                        onClick={() => setShowInterestModal(true)}
+                        className="text-xs text-teal font-semibold hover:underline flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add more
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -442,6 +508,110 @@ const StudentProfilePage = () => {
           </div>
         </div>
       </div>
+      {/* Experience Modal */}
+      {showExpModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-base font-bold text-navy">Add Experience / Project</h2>
+              <button onClick={() => setShowExpModal(false)} className="text-gray-400 hover:text-navy">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Frontend Developer Intern at XYZ"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-navy bg-gray-50"
+                  value={expTitle}
+                  onChange={(e) => setExpTitle(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Description</label>
+                <textarea
+                  placeholder="Briefly describe what you did..."
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-navy bg-gray-50 resize-none"
+                  rows={3}
+                  value={expDesc}
+                  onChange={(e) => setExpDesc(e.target.value)}
+                />
+              </div>
+              <button
+                onClick={() => {
+                  if (expTitle.trim()) {
+                    setExperiences([...experiences, { title: expTitle.trim(), description: expDesc.trim() }]);
+                    setExpTitle('');
+                    setExpDesc('');
+                    setShowExpModal(false);
+                  }
+                }}
+                className="w-full bg-navy text-white font-semibold py-3 rounded-xl hover:bg-navy-light transition-colors text-sm">
+                Add Entry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interests Modal */}
+      {showInterestModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-base font-bold text-navy">Add Internship Interests</h2>
+              <button onClick={() => setShowInterestModal(false)} className="text-gray-400 hover:text-navy">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                  Interest (press Enter to add)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. Software Engineering, Fintech"
+                    className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-navy bg-gray-50"
+                    value={interestInput}
+                    onChange={(e) => setInterestInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && interestInput.trim()) {
+                        setInterests([...interests, interestInput.trim()]);
+                        setInterestInput('');
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (interestInput.trim()) {
+                        setInterests([...interests, interestInput.trim()]);
+                        setInterestInput('');
+                      }
+                    }}
+                    className="bg-navy text-white px-4 rounded-xl hover:bg-navy-light transition-colors">
+                    +
+                  </button>
+                </div>
+              </div>
+              {interests.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {interests.map((interest, i) => (
+                    <span key={i} className="bg-teal-light text-teal-dark text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
+                      {interest}
+                      <button onClick={() => setInterests(interests.filter((_, idx) => idx !== i))} className="hover:text-red-500">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setShowInterestModal(false)}
+                className="w-full bg-navy text-white font-semibold py-3 rounded-xl hover:bg-navy-light transition-colors text-sm">
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
