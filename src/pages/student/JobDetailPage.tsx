@@ -22,6 +22,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import api from '../../services/api';
+import { getMatchScore } from '../../services/matchScoreCache';
 import { type Job } from '../../types';
 
 interface Application {
@@ -45,6 +46,7 @@ const JobDetailPage = () => {
   const [, setMatchReason] = useState('');
   const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
+  const [similarScores, setSimilarScores] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const controller = new AbortController();
@@ -72,6 +74,19 @@ const JobDetailPage = () => {
 
         const allJobs = allJobsRes.data?.data?.jobs ?? [];
         setSimilarJobs(allJobs.filter((j: Job) => j.id !== jobId).slice(0, 3));
+
+        const similar = allJobs.filter((j: Job) => j.id !== jobId).slice(0, 3);
+        setSimilarJobs(similar);
+
+        // Load scores for similar jobs
+        similar.forEach(async (j: Job) => {
+          try {
+            const { score } = await getMatchScore(j.id);
+            setSimilarScores((prev) => ({ ...prev, [j.id]: score }));
+          } catch {
+            setSimilarScores((prev) => ({ ...prev, [j.id]: 0 }));
+          }
+        });
 
         // Fetch match breakdown after validating job existence
         try {
@@ -350,8 +365,7 @@ const JobDetailPage = () => {
                 </div>
                 <div className="grid md:grid-cols-3 gap-4">
                   {similarJobs.map((sJob) => {
-                    const hash = sJob.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                    const mockScore = (hash % 15) + 80;
+                    const similarScore = similarScores[sJob.id];
 
                     return (
                       <div
@@ -380,7 +394,7 @@ const JobDetailPage = () => {
                         </p>
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-semibold text-teal">
-                            {mockScore}% Match
+                            {similarScore !== undefined ? `${similarScore}% Match` : '...'}
                           </span>
                           <Bookmark className="w-4 h-4 text-gray-300 hover:text-navy" />
                         </div>
