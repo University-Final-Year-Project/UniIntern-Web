@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { clearMatchCache } from '../../services/matchScoreCache';
 
 const EditProfilePage = () => {
   const { user, setAuth } = useAuth();
@@ -64,6 +65,8 @@ const EditProfilePage = () => {
       const updatedUser = response.data.data;
       const token = localStorage.getItem('token') ?? '';
       setAuth(updatedUser, token);
+      await api.delete('/auth/match-cache');
+      clearMatchCache();
       setSuccess('Profile updated successfully!');
       setTimeout(() => navigate('/profile'), 1500);
     } catch (err: any) {
