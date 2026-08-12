@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { uploadImageToCloudinary } from '../../services/cloudinaryService';
 import { clearMatchCache } from '../../services/matchScoreCache';
 
 const EditProfilePage = () => {
@@ -19,6 +20,10 @@ const EditProfilePage = () => {
   const [skills, setSkills] = useState<string[]>(profile?.skills ?? []);
   const [biography, setBiography] = useState(profile?.biography ?? '');
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatarUrl ?? '');
+  const [coverUrl, setCoverUrl] = useState(profile?.coverUrl ?? '');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -44,6 +49,43 @@ const EditProfilePage = () => {
 
   const handleRemoveSkill = (skill: string) => {
     setSkills(skills.filter((s) => s !== skill));
+  };
+
+  const handleImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'avatar' | 'cover',
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+    try {
+      if (type === 'avatar') setUploadingAvatar(true);
+      else setUploadingCover(true);
+
+      const url = await uploadImageToCloudinary(
+        file,
+        type === 'avatar' ? 'avatars' : 'covers',
+      );
+
+      if (type === 'avatar') setAvatarUrl(url);
+      else setCoverUrl(url);
+
+      // Save to backend immediately
+      const response = await api.patch('/auth/profile', {
+        ...(type === 'avatar' ? { avatarUrl: url } : { coverUrl: url }),
+      });
+      const updatedUser = response.data.data;
+      const token = localStorage.getItem('token') ?? '';
+      setAuth(updatedUser, token);
+    } catch (err: any) {
+      alert(err.message ?? 'Failed to upload image.');
+    } finally {
+      if (type === 'avatar') setUploadingAvatar(false);
+      else setUploadingCover(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -306,39 +348,69 @@ const EditProfilePage = () => {
                   </h2>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Profile Photo */}
                   <div>
                     <p className="text-xs font-medium text-gray-500 mb-2">Profile Photo</p>
-                    <div className="border-2 border-dashed border-gray-200 rounded-xl h-32 flex flex-col items-center justify-center cursor-pointer hover:border-navy transition-colors bg-gray-50">
-                      {profile?.avatarUrl ? (
-                        <img
-                          src={profile.avatarUrl}
-                          alt="avatar"
-                          className="w-full h-full object-cover rounded-xl"
-                        />
-                      ) : (
-                        <>
-                          <span className="text-2xl mb-2">📷</span>
-                          <p className="text-xs text-gray-400">Click to upload photo</p>
-                        </>
-                      )}
-                    </div>
+                    <label className="block cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleImageUpload(e, 'avatar')}
+                      />
+                      <div className="border-2 border-dashed border-gray-200 rounded-xl aspect-square w-full flex flex-col items-center justify-center hover:border-navy transition-colors bg-gray-50 overflow-hidden relative">
+                        {uploadingAvatar ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-6 h-6 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+                            <p className="text-xs text-gray-400">Uploading...</p>
+                          </div>
+                        ) : avatarUrl ? (
+                          <>
+                              <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-xl" style={{ aspectRatio: '1/1' }} />                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <p className="text-white text-xs font-semibold">Change Photo</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-2xl mb-2">📷</span>
+                            <p className="text-xs text-gray-400">Click to upload photo</p>
+                          </>
+                        )}
+                      </div>
+                    </label>
                   </div>
+
+                  {/* Cover Photo */}
                   <div>
                     <p className="text-xs font-medium text-gray-500 mb-2">Cover Photo</p>
-                    <div className="border-2 border-dashed border-gray-200 rounded-xl h-32 flex flex-col items-center justify-center cursor-pointer hover:border-navy transition-colors bg-gray-50 relative overflow-hidden">
-                      {profile?.coverUrl ? (
-                        <img
-                          src={profile.coverUrl}
-                          alt="cover"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <>
-                          <span className="text-2xl mb-2">🖼</span>
-                          <p className="text-xs text-gray-400">Click or drag banner here</p>
-                        </>
-                      )}
-                    </div>
+                    <label className="block cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleImageUpload(e, 'cover')}
+                      />
+                      <div className="border-2 border-dashed border-gray-200 rounded-xl h-32 flex flex-col items-center justify-center hover:border-navy transition-colors bg-gray-50 overflow-hidden relative">
+                        {uploadingCover ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-6 h-6 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+                            <p className="text-xs text-gray-400">Uploading...</p>
+                          </div>
+                        ) : coverUrl ? (
+                          <>
+                            <img src={coverUrl} alt="cover" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <p className="text-white text-xs font-semibold">Change Cover</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-2xl mb-2">🖼</span>
+                            <p className="text-xs text-gray-400">Click to upload cover</p>
+                          </>
+                        )}
+                      </div>
+                    </label>
                   </div>
                 </div>
               </div>
