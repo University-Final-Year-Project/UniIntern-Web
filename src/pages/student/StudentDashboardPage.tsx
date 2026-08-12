@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -13,8 +13,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { getMatchScore } from '../../services/matchScoreCache';
 import { type Job, type Application } from '../../types';
-import Navbar from '../../components/common/Navbar';
+
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: 'bg-amber-50 text-amber-700 border-amber-200/60',
@@ -42,23 +43,17 @@ const StudentDashboardPage: React.FC = () => {
   const [matchScores, setMatchScores] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
+  const hasFetched = useRef(false);
 
-  const formatScore = (rawScore: any): number => {
-    if (rawScore === null || rawScore === undefined || isNaN(rawScore)) return 0;
-    const num = Number(rawScore);
-    const percentage = num <= 1 && num > 0 ? num * 100 : num;
-    return Math.round(percentage);
-  };
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setHasError(false);
 
     try {
-      const [jobsRes, appsRes, matchesRes] = await Promise.allSettled([
+      const [jobsRes, appsRes] = await Promise.allSettled([
         api.get('/jobs?limit=4'),
         api.get('/applications/my-applications'),
-        api.get('/jobs/matches'),
       ]);
 
       let fetchedJobs: Job[] = [];
@@ -71,32 +66,29 @@ const StudentDashboardPage: React.FC = () => {
         fetchedApps = appsRes.value.data?.data ?? appsRes.value.data ?? [];
       }
 
-      setJobs(fetchedJobs);
-      setApplications(fetchedApps);
+      // Load scores first, then set all state together
+      const scoreEntries = await Promise.allSettled(
+        fetchedJobs.map(async (job) => {
+          const { score } = await getMatchScore(job.id);
+          return { id: job.id, score };
+        })
+      );
 
       const scoresMap: Record<string, number> = {};
-
-      // 1. Extract scores provided directly from jobs list payload (Gemini calculated)
-      fetchedJobs.forEach((job: any) => {
-        const rawScore = job.matchScore ?? job.score ?? job.match;
-        scoresMap[job.id] = formatScore(rawScore);
+      scoreEntries.forEach((result) => {
+        if (result.status === 'fulfilled') {
+          scoresMap[result.value.id] = result.value.score;
+        }
       });
 
-      // 2. Extract scores from Gemini AI matches endpoint response
-      if (matchesRes.status === 'fulfilled') {
-        const matchesData = matchesRes.value.data?.data ?? matchesRes.value.data ?? [];
-        if (Array.isArray(matchesData)) {
-          matchesData.forEach((item: any) => {
-            const jobId = item.jobId ?? item.job?.id ?? item.id;
-            const score = formatScore(item.score ?? item.matchScore ?? item.match);
-            if (jobId) {
-              scoresMap[jobId] = score;
-            }
-          });
-        }
-      }
-
+      // Set all state at once so UI renders with scores already available
+      setJobs(fetchedJobs);
+      setApplications(fetchedApps);
       setMatchScores(scoresMap);
+
+      console.log('scoresMap:', scoresMap);
+      console.log('fetchedJobs ids:', fetchedJobs.map(j => j.id));
+
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
       setHasError(true);
@@ -106,8 +98,10 @@ const StudentDashboardPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+  if (hasFetched.current) return;
+  hasFetched.current = true;
+  loadData();
+}, []);
 
   const appliedCount = applications.length;
   const pendingCount = useMemo(
@@ -137,18 +131,31 @@ const StudentDashboardPage: React.FC = () => {
     return score;
   }, [profile]);
 
-  const heatmap = useMemo(
-    () =>
-      Array.from({ length: 28 }, (_, i) =>
-        i > 18 ? Math.floor(Math.random() * 4) + 1 : Math.floor(Math.random() * 3)
-      ),
-    []
-  );
+  const heatmap = useMemo(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: 28 }, (_, i) => {
+    const day = new Date(today);
+    day.setDate(today.getDate() - (27 - i));
+
+    const count = applications.filter((app) => {
+      const applied = new Date(app.appliedAt);
+      applied.setHours(0, 0, 0, 0);
+      return applied.getTime() === day.getTime();
+    }).length;
+
+    if (count === 0) return 0;
+    if (count === 1) return 1;
+    if (count === 2) return 2;
+    if (count === 3) return 3;
+    return 4;
+  });
+}, [applications]);
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex flex-col">
-        <Navbar />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -162,7 +169,6 @@ const StudentDashboardPage: React.FC = () => {
   if (hasError) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex flex-col">
-        <Navbar />
         <div className="flex-1 flex flex-col items-center justify-center px-4">
           <div className="p-3 bg-red-50 text-red-600 rounded-2xl mb-4">
             <AlertCircle className="w-8 h-8" />
@@ -459,7 +465,7 @@ const StudentDashboardPage: React.FC = () => {
               </div>
 
               <button 
-                onClick={() => navigate('/calendar')}
+                onClick={() => navigate('/feed')}
                 className="w-full border border-gray-200 text-navy text-xs font-semibold py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
                 Open Schedule
               </button>
@@ -471,12 +477,38 @@ const StudentDashboardPage: React.FC = () => {
               <p className="text-xs text-gray-400 mb-4">Application submission frequency</p>
 
               <div className="grid grid-cols-7 gap-1.5 mb-3">
-                {heatmap.map((level, i) => (
-                  <div
-                    key={i}
-                    className={`w-full aspect-square rounded-md transition-colors ${HEATMAP_COLORS[level]}`}
-                  />
-                ))}
+                {heatmap.map((level, i) => {
+                  const day = new Date();
+                  day.setHours(0, 0, 0, 0);
+                  day.setDate(day.getDate() - (27 - i));
+                  const dateLabel = day.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                  });
+                  const count = applications.filter((app) => {
+                    const applied = new Date(app.appliedAt);
+                    applied.setHours(0, 0, 0, 0);
+                    return applied.getTime() === day.getTime();
+                  }).length;
+
+                  return (
+                    <div key={i} className="relative group">
+                      <div
+                        className={`w-full aspect-square rounded-md transition-colors cursor-pointer ${HEATMAP_COLORS[level]}`}
+                      />
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 hidden group-hover:block pointer-events-none">
+                        <div className="bg-navy text-white text-[10px] font-medium px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
+                          {count === 0 ? 'No applications' : `${count} application${count > 1 ? 's' : ''}`}
+                          <br />
+                          <span className="text-white/60">{dateLabel}</span>
+                        </div>
+                        <div className="w-2 h-2 bg-navy rotate-45 mx-auto -mt-1" />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
