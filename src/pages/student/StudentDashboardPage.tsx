@@ -415,7 +415,6 @@ const StudentDashboardPage: React.FC = () => {
                   <Calendar className="w-4 h-4 text-navy" />
                   <h2 className="text-base font-bold text-navy">Deadlines</h2>
                 </div>
-                <span className="text-xs font-bold text-gray-400">Next 14 Days</span>
               </div>
 
               <div className="space-y-3 mb-5">
@@ -463,12 +462,6 @@ const StudentDashboardPage: React.FC = () => {
                   </div>
                 )}
               </div>
-
-              <button 
-                onClick={() => navigate('/feed')}
-                className="w-full border border-gray-200 text-navy text-xs font-semibold py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
-                Open Schedule
-              </button>
             </section>
 
             {/* Search Activity Visualizer */}
