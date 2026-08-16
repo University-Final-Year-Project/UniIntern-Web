@@ -11,6 +11,7 @@ import {
   BarChart2,
 } from 'lucide-react';
 import api from '../../services/api';
+import { getMatchScore } from '../../services/matchScoreCache';
 
 interface Applicant {
   id: string;
@@ -33,11 +34,6 @@ interface Applicant {
 }
 
 type FilterType = 'ALL' | 'TOP' | 'REVIEW' | 'SHORTLISTED';
-
-const getMatchScore = (skills: string[]) => {
-  const base = 60 + skills.length * 5;
-  return Math.min(95, base);
-};
 
 const getScoreColor = (score: number) => {
   if (score >= 85) return { ring: 'stroke-teal', text: 'text-teal', label: 'Strong Match', bg: 'bg-teal-light' };
@@ -80,19 +76,21 @@ const ReviewApplicantsPage = () => {
   const [filter, setFilter] = useState<FilterType>('ALL');
   const [sortBy, setSortBy] = useState('match');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [matchScores, setMatchScores] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const load = async () => {
       try {
+        let appsData: Applicant[] = [];
+
         if (jobId) {
           const [jobRes, appsRes] = await Promise.all([
             api.get(`/jobs/${jobId}`),
             api.get(`/applications/job/${jobId}`),
           ]);
           setJobTitle(jobRes.data.data.title);
-          setApplicants(appsRes.data.data ?? []);
+          appsData = appsRes.data.data ?? [];
         } else {
-          // Load all applicants across all jobs
           const jobsRes = await api.get('/jobs/company/my-jobs');
           const jobs = jobsRes.data.data ?? [];
           if (jobs.length > 0) {
@@ -102,9 +100,23 @@ const ReviewApplicantsPage = () => {
                 api.get(`/applications/job/${j.id}`).then((r) => r.data.data ?? []),
               ),
             );
-            setApplicants(appsArrays.flat());
+            appsData = appsArrays.flat();
           }
         }
+
+        setApplicants(appsData);
+
+        // Load real match scores for each applicant
+        appsData.forEach(async (app: Applicant) => {
+          if (!jobId) return;
+          try {
+            const { score } = await getMatchScore(jobId);
+            setMatchScores((prev) => ({ ...prev, [app.id]: score }));
+          } catch {
+            const fallback = Math.min(95, 60 + (app.student.studentProfile?.skills?.length ?? 0) * 5);
+            setMatchScores((prev) => ({ ...prev, [app.id]: fallback }));
+          }
+        });
       } catch (err) {
         console.error(err);
       } finally {
@@ -128,22 +140,47 @@ const ReviewApplicantsPage = () => {
     }
   };
 
-  const filteredApplicants = applicants.filter((a) => {
-    const score = getMatchScore(a.student.studentProfile?.skills ?? []);
-    if (filter === 'TOP') return score >= 85;
-    if (filter === 'REVIEW') return a.status === 'PENDING';
-    if (filter === 'SHORTLISTED') return a.status === 'SHORTLISTED';
-    return true;
-  });
+  const getScore = (app: Applicant) =>
+    matchScores[app.id] ?? Math.min(95, 60 + (app.student.studentProfile?.skills?.length ?? 0) * 5);
+
+  const filteredApplicants = applicants
+    .filter((a) => {
+      const score = getScore(a);
+      if (filter === 'TOP') return score >= 85;
+      if (filter === 'REVIEW') return a.status === 'PENDING';
+      if (filter === 'SHORTLISTED') return a.status === 'SHORTLISTED';
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'match') return getScore(b) - getScore(a);
+      if (sortBy === 'date') return new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime();
+      if (sortBy === 'name') {
+        const nameA = `${a.student.studentProfile?.firstName} ${a.student.studentProfile?.lastName}`;
+        const nameB = `${b.student.studentProfile?.firstName} ${b.student.studentProfile?.lastName}`;
+        return nameA.localeCompare(nameB);
+      }
+      return 0;
+    });
 
   const totalApplied = applicants.length;
-  const highMatches = applicants.filter(
-    (a) => getMatchScore(a.student.studentProfile?.skills ?? []) >= 85,
-  ).length;
+  const highMatches = applicants.filter((a) => getScore(a) >= 85).length;
   const shortlistedCount = applicants.filter((a) => a.status === 'SHORTLISTED').length;
   const avgScore = applicants.length > 0
-    ? Math.round(applicants.reduce((sum, a) => sum + getMatchScore(a.student.studentProfile?.skills ?? []), 0) / applicants.length)
+    ? Math.round(applicants.reduce((sum, a) => sum + getScore(a), 0) / applicants.length)
     : 0;
+
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date();
+    day.setDate(day.getDate() - (6 - i));
+    day.setHours(0, 0, 0, 0);
+    return applicants.filter((a) => {
+      const applied = new Date(a.appliedAt);
+      applied.setHours(0, 0, 0, 0);
+      return applied.getTime() === day.getTime();
+    }).length;
+  });
+  const maxTrend = Math.max(...last7Days, 1);
+  const trendHeights = last7Days.map((v) => Math.round((v / maxTrend) * 55) + 5);
 
   const tabs: { key: FilterType; label: string; count?: number }[] = [
     { key: 'ALL', label: 'All Candidates' },
@@ -156,6 +193,23 @@ const ReviewApplicantsPage = () => {
     'bg-purple-400', 'bg-blue-400', 'bg-teal', 'bg-amber-400', 'bg-pink-400',
   ];
 
+  const handleExport = () => {
+    const csv = [
+      'Name,University,Course,Skills,Status,Applied At',
+      ...filteredApplicants.map((app) => {
+        const p = app.student.studentProfile;
+        return `${p?.firstName} ${p?.lastName},${p?.university ?? ''},${p?.courseOfStudy ?? ''},"${(p?.skills ?? []).join(', ')}",${app.status},${new Date(app.appliedAt).toLocaleDateString()}`;
+      }),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `candidates_${jobTitle.replace(/\s+/g, '_')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-8 py-8">
 
@@ -164,21 +218,21 @@ const ReviewApplicantsPage = () => {
         <Link to="/listings" className="hover:text-navy transition-colors">
           My Listings
         </Link>
-        <ChevronRight className="w-4 h-4 text-gray-400" />
+        <ChevronRight className="w-4 h-4" />
         <span className="text-navy font-medium">{jobTitle}</span>
       </div>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-navy mb-0.5">
-            Candidate Review Board
-          </h1>
+          <h1 className="text-2xl font-bold text-navy mb-0.5">Candidate Review Board</h1>
           <p className="text-sm text-gray-400">
             {jobTitle} {jobId ? '| Your Company' : ''}
           </p>
         </div>
-        <button className="flex items-center gap-2 border border-gray-200 text-navy text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-2 border border-gray-200 text-navy text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
           <Upload className="w-4 h-4" /> Export List
         </button>
       </div>
@@ -234,26 +288,20 @@ const ReviewApplicantsPage = () => {
           ) : (
             filteredApplicants.map((app, i) => {
               const profile = app.student.studentProfile;
-              const score = getMatchScore(profile?.skills ?? []);
+              const score = getScore(app);
               const scoreStyle = getScoreColor(score);
               const color = avatarColors[i % avatarColors.length];
               const isShortlisted = app.status === 'SHORTLISTED';
               const isRejected = app.status === 'REJECTED';
 
               return (
-                <div
-                  key={app.id}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                <div key={app.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
 
                   {/* Student Info */}
                   <div className="flex items-start gap-4 mb-4">
                     <div className={`w-14 h-14 rounded-2xl ${color} flex items-center justify-center flex-shrink-0 overflow-hidden`}>
                       {profile?.avatarUrl ? (
-                        <img
-                          src={profile.avatarUrl}
-                          alt="avatar"
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-white font-bold text-lg">
                           {profile?.firstName?.charAt(0) ?? 'S'}
@@ -267,16 +315,14 @@ const ReviewApplicantsPage = () => {
                             {profile?.firstName} {profile?.lastName}
                           </h3>
                           <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
-                            <GraduationCap className="w-3.5 h-3.5 text-gray-400" />
-                            {profile?.university ?? 'University'} •{' '}
-                            {profile?.yearOfStudy ? `Year ${profile.yearOfStudy}` : ''}{' '}
-                            {profile?.courseOfStudy ? `• ${profile.courseOfStudy}` : ''}
+                            <GraduationCap className="w-3.5 h-3.5" />
+                            {profile?.university ?? 'University'}
+                            {profile?.yearOfStudy ? ` • Year ${profile.yearOfStudy}` : ''}
+                            {profile?.courseOfStudy ? ` • ${profile.courseOfStudy}` : ''}
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {profile?.skills.slice(0, 3).map((skill) => (
-                              <span
-                                key={skill}
-                                className="bg-gray-100 text-gray-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
+                            {(profile?.skills ?? []).slice(0, 3).map((skill) => (
+                              <span key={skill} className="bg-gray-100 text-gray-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
                                 {skill}
                               </span>
                             ))}
@@ -304,8 +350,8 @@ const ReviewApplicantsPage = () => {
                       <p className="text-xs text-gray-600 leading-5">
                         {profile?.biography
                           ? profile.biography.substring(0, 150) + '...'
-                          : `${profile?.firstName} demonstrates a skill profile aligned with ${
-                              profile?.skills.slice(0, 2).join(' and ') || 'this role'
+                          : `${profile?.firstName ?? 'This candidate'} demonstrates a skill profile aligned with ${
+                              (profile?.skills ?? []).slice(0, 2).join(' and ') || 'this role'
                             }. Their background in ${
                               profile?.courseOfStudy ?? 'their field'
                             } makes them a ${scoreStyle.label.toLowerCase()} for this position.`}
@@ -343,7 +389,9 @@ const ReviewApplicantsPage = () => {
                       </div>
                     )}
 
-                    <button className="ml-auto border border-gray-200 text-navy text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+                    <button
+                      onClick={() => navigate(`/students/${app.student.id}`)}
+                      className="ml-auto border border-gray-200 text-navy text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
                       View Profile
                     </button>
                   </div>
@@ -372,13 +420,9 @@ const ReviewApplicantsPage = () => {
                 <p className="text-xs text-teal-dark font-medium">High Matches</p>
               </div>
             </div>
-
-            {/* Trend */}
-            <p className="text-xs font-semibold text-gray-400 mb-2">
-              Application Trend (7 Days)
-            </p>
+            <p className="text-xs font-semibold text-gray-400 mb-2">Application Trend (7 Days)</p>
             <svg viewBox="0 0 200 60" className="w-full h-14">
-              {[20, 35, 25, 45, 40, 55, 50].map((v, i) => (
+              {trendHeights.map((v, i) => (
                 <rect
                   key={i}
                   x={i * 28 + 2}
@@ -386,8 +430,8 @@ const ReviewApplicantsPage = () => {
                   width="22"
                   height={v}
                   rx="4"
-                  fill={i === 5 ? '#00c896' : '#1a2b4a'}
-                  opacity={i === 5 ? 1 : 0.7}
+                  fill={i === 6 ? '#00c896' : '#1a2b4a'}
+                  opacity={i === 6 ? 1 : 0.7}
                 />
               ))}
             </svg>
@@ -400,9 +444,8 @@ const ReviewApplicantsPage = () => {
               <h2 className="text-base font-bold text-white">Role Insights</h2>
             </div>
             <p className="text-xs text-white/60 leading-5 mb-4">
-              Candidates scoring &gt;85% on this listing frequently possess
-              strong technical skills. Consider prioritizing profiles with
-              relevant project experience.
+              Candidates scoring &gt;85% on this listing frequently possess strong technical
+              skills. Consider prioritizing profiles with relevant project experience.
             </p>
 
             <div className="mb-4">
@@ -411,18 +454,15 @@ const ReviewApplicantsPage = () => {
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {Array.from(
-                  new Set(
-                    applicants.flatMap((a) => a.student.studentProfile?.skills ?? []),
-                  ),
-                )
-                  .slice(0, 4)
-                  .map((skill) => (
-                    <span
-                      key={skill}
-                      className="bg-white/10 text-white text-[10px] font-medium px-2.5 py-1 rounded-full">
-                      {skill}
-                    </span>
-                  ))}
+                  new Set(applicants.flatMap((a) => a.student.studentProfile?.skills ?? [])),
+                ).slice(0, 4).map((skill) => (
+                  <span key={skill} className="bg-white/10 text-white text-[10px] font-medium px-2.5 py-1 rounded-full">
+                    {skill}
+                  </span>
+                ))}
+                {applicants.length === 0 && (
+                  <p className="text-xs text-white/40">No data yet</p>
+                )}
               </div>
             </div>
 
@@ -433,17 +473,11 @@ const ReviewApplicantsPage = () => {
               <div className="space-y-1">
                 {Array.from(
                   new Set(
-                    applicants
-                      .map((a) => a.student.studentProfile?.university)
-                      .filter(Boolean),
+                    applicants.map((a) => a.student.studentProfile?.university).filter(Boolean),
                   ),
-                )
-                  .slice(0, 3)
-                  .map((uni) => (
-                    <p key={uni} className="text-xs text-white/60">
-                      {uni}
-                    </p>
-                  ))}
+                ).slice(0, 3).map((uni) => (
+                  <p key={uni} className="text-xs text-white/60">{uni}</p>
+                ))}
                 {applicants.length === 0 && (
                   <p className="text-xs text-white/40">No data yet</p>
                 )}
@@ -459,10 +493,7 @@ const ReviewApplicantsPage = () => {
             <div className="flex items-center gap-3">
               <p className="text-3xl font-bold text-navy">{avgScore}%</p>
               <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-teal rounded-full"
-                  style={{ width: `${avgScore}%` }}
-                />
+                <div className="h-full bg-teal rounded-full" style={{ width: `${avgScore}%` }} />
               </div>
             </div>
           </div>
