@@ -34,6 +34,7 @@ interface Application {
 interface Job {
   id: string;
   title: string;
+  isActive: boolean;
   _count: { applications: number };
 }
 
@@ -78,6 +79,10 @@ const CompanyDashboardPage = () => {
   const totalApplicants = jobs.reduce((sum, j) => sum + j._count.applications, 0);
   const shortlisted = applications.filter((a) => a.status === 'SHORTLISTED').length;
 
+  const topMatches = applications
+  .filter((a) => a.student?.studentProfile)
+  .slice(0, 3);
+
   const trendData = [40, 55, 45, 60, 75, 65, 90];
 
   return (
@@ -97,28 +102,28 @@ const CompanyDashboardPage = () => {
         {[
           {
             label: 'Active Listings',
-            value: jobs.length,
-            sub: '+3 this week',
+            value: jobs.filter((j: any) => j.isActive).length,
+            sub: `${jobs.length} total listings`,
             icon: Briefcase,
             teal: false,
           },
           {
             label: 'Total Applicants',
             value: totalApplicants.toLocaleString(),
-            sub: '+12% vs last mo',
+            sub: `across ${jobs.length} listings`,
             icon: Users,
             teal: false,
           },
           {
             label: 'Shortlisted',
             value: shortlisted,
-            sub: 'Action required',
+            sub: shortlisted > 0 ? 'Action required' : 'None yet',
             icon: Star,
             teal: false,
           },
           {
             label: 'Avg Match Score',
-            value: '91%',
+            value: '—',
             sub: null,
             icon: BarChart2,
             teal: true,
@@ -220,13 +225,28 @@ const CompanyDashboardPage = () => {
             {[
               { icon: Plus, label: 'Post New Internship', path: '/post-job', bg: 'bg-navy text-white' },
               { icon: Users, label: 'View All Candidates', path: '/candidates', bg: 'bg-white border border-gray-100' },
-              { icon: Download, label: 'Download Report', path: '#', bg: 'bg-white border border-gray-100' },
-            ].map((action) => {
+              { icon: Download, label: 'Download Report', path: null, bg: 'bg-white border border-gray-100' },            ].map((action) => {
               const Icon = action.icon;
               return (
                 <button
                   key={action.label}
-                  onClick={() => navigate(action.path)}
+                  onClick={() => {
+                    if (action.path) {
+                      navigate(action.path);
+                    } else {
+                      const csv = [
+                        'Job Title,Applicants',
+                        ...jobs.map((j) => `${j.title},${j._count.applications}`)
+                      ].join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'uniintern_report.csv';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }
+                  }}
                   className={`${action.bg} rounded-2xl p-5 text-center shadow-sm hover:shadow-md transition-shadow`}>
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 ${
                     action.bg.includes('navy') ? 'bg-white/20' : 'bg-gray-100'
@@ -247,24 +267,30 @@ const CompanyDashboardPage = () => {
           {/* Top Matches */}
           <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
             <h2 className="text-base font-bold text-navy mb-4">Top Matches</h2>
-            {[98, 85, 82].map((score, i) => (
-              <div key={i} className="flex items-center gap-3 mb-3">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-white text-sm font-bold ${
-                    score >= 90 ? 'bg-teal' : score >= 80 ? 'bg-amber-400' : 'bg-blue-400'
-                  }`}>
-                  {score}%
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-navy">
-                    {['Sarah Chen', 'Marcus Thompson', 'Elena Rodriguez'][i]}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {['UX Design Intern', 'Frontend Engineer', 'Product Designer'][i]}
-                  </p>
-                </div>
-              </div>
-            ))}
+            {topMatches.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-4">No applicants yet.</p>
+            ) : (
+              topMatches.map((app, i) => {
+                const firstName = app.student?.studentProfile?.firstName ?? 'Student';
+                const lastName = app.student?.studentProfile?.lastName ?? '';
+                const colors = ['bg-teal', 'bg-amber-400', 'bg-blue-400'];
+                return (
+                  <div key={app.id} className="flex items-center gap-3 mb-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-white text-sm font-bold ${colors[i]}`}>
+                      {firstName.charAt(0)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-navy">
+                        {firstName} {lastName}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {app.jobPosting?.title ?? 'Internship'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
           {/* Application Trend */}
