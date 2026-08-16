@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { 
+  Building2, 
+  MapPin, 
+  Pencil, 
+  Check, 
+  Link as LinkIcon, 
+  Briefcase, 
+  Users, 
+  Calendar 
+} from 'lucide-react';
 
 const ProfileStrength = ({ percent }: { percent: number }) => {
   const r = 45;
@@ -34,7 +44,7 @@ const CompanyProfilePage = () => {
   const [description, setDescription] = useState(profile?.description ?? '');
   const [website, setWebsite] = useState(profile?.website ?? '');
   const [location, setLocation] = useState(profile?.location ?? '');
-  const [email, setEmail] = useState(user?.email ?? '');
+  const [email] = useState(user?.email ?? '');
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -45,7 +55,9 @@ const CompanyProfilePage = () => {
     api.get('/jobs/company/my-jobs').then((res) => {
       const jobs = res.data.data ?? [];
       setJobCount(jobs.length);
-      setTotalApps(jobs.reduce((sum: number, j: any) => sum + j._count.applications, 0));
+      setTotalApps(jobs.reduce((sum: number, j: any) => sum + (j._count?.applications ?? 0), 0));
+    }).catch(() => {
+      // Handle error gracefully if needed
     });
   }, []);
 
@@ -86,47 +98,54 @@ const CompanyProfilePage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-8 py-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8">
 
       {/* Cover Banner */}
       <div className="h-40 rounded-2xl bg-gradient-to-r from-navy to-navy-light relative overflow-hidden mb-0">
         <div
-          className="absolute inset-0 opacity-20"
+          className="absolute inset-0 opacity-20 bg-cover bg-center"
           style={{
             backgroundImage: 'url(https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1200&q=80)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
           }}
         />
-        <button className="absolute top-4 right-4 bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-white/30 transition-colors flex items-center gap-1.5">
-          ✎ Edit Cover
+        <button 
+          type="button" 
+          className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 backdrop-blur-sm"
+        >
+          <Pencil className="w-3.5 h-3.5" /> Edit Cover
         </button>
       </div>
 
       {/* Company Header */}
-      <div className="flex items-end gap-5 -mt-8 mb-8 px-2">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-5 -mt-10 mb-8 px-2 relative z-10">
         <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center flex-shrink-0">
           <span className="text-navy text-3xl font-bold">
             {companyName?.charAt(0) ?? 'C'}
           </span>
         </div>
-        <div className="flex-1 pb-2">
+        <div className="flex-1 pb-1">
           <h1 className="text-2xl font-bold text-navy">{companyName || 'Company Name'}</h1>
-          <div className="flex items-center gap-3 text-xs text-gray-400">
-            {industry && <span>🏢 {industry}</span>}
+          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mt-1">
+            {industry && (
+              <span className="flex items-center gap-1">
+                <Building2 className="w-3.5 h-3.5 text-gray-400" />
+                {industry}
+              </span>
+            )}
+            {industry && location && <span>•</span>}
             {location && (
-              <>
-                <span>•</span>
-                <span>📍 {location}</span>
-              </>
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                {location}
+              </span>
             )}
           </div>
         </div>
         <button
           onClick={handleSave}
           disabled={isLoading}
-          className="mb-2 bg-navy text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-navy-light transition-colors flex items-center gap-2 disabled:opacity-70">
-          ✎ {isLoading ? 'Saving...' : 'Edit Profile'}
+          className="bg-navy text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-navy-light transition-colors flex items-center justify-center gap-2 disabled:opacity-70 self-start sm:self-end">
+          <Pencil className="w-4 h-4" /> {isLoading ? 'Saving...' : 'Edit Profile'}
         </button>
       </div>
 
@@ -136,13 +155,13 @@ const CompanyProfilePage = () => {
         </div>
       )}
       {success && (
-        <div className="bg-teal-light border border-teal text-teal-dark text-sm px-4 py-3 rounded-xl mb-4">
-          ✓ {success}
+        <div className="bg-teal-light border border-teal text-teal-dark text-sm px-4 py-3 rounded-xl mb-4 flex items-center gap-2">
+          <Check className="w-4 h-4" /> {success}
         </div>
       )}
 
       <form onSubmit={handleSave}>
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-5">
@@ -162,9 +181,21 @@ const CompanyProfilePage = () => {
             {/* Contact Information */}
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
               <h2 className="text-base font-bold text-navy mb-4">
-                Contact Information
+                Contact & General Information
               </h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                    Company Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Acme Corp"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-navy bg-gray-50 focus:bg-white transition-colors"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
                     Website
@@ -184,7 +215,7 @@ const CompanyProfilePage = () => {
                   <input
                     type="email"
                     placeholder="careers@company.com"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-navy bg-gray-50 focus:bg-white transition-colors"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-navy focus:outline-none focus:border-navy bg-gray-100 text-gray-500 cursor-not-allowed"
                     value={email}
                     readOnly
                   />
@@ -201,9 +232,9 @@ const CompanyProfilePage = () => {
                     onChange={(e) => setIndustry(e.target.value)}
                   />
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
-                    HQ Address
+                    HQ Address / Location
                   </label>
                   <input
                     type="text"
@@ -219,16 +250,16 @@ const CompanyProfilePage = () => {
             {/* Social Links */}
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
               <h2 className="text-base font-bold text-navy mb-4">Social Links</h2>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
                   className="flex items-center gap-2 border border-gray-200 text-navy text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
-                  🔗 LinkedIn
+                  <LinkIcon className="w-4 h-4 text-gray-400" /> LinkedIn
                 </button>
                 <button
                   type="button"
                   className="flex items-center gap-2 border border-gray-200 text-navy text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
-                  🔗 Twitter
+                  <LinkIcon className="w-4 h-4 text-gray-400" /> Twitter
                 </button>
               </div>
             </div>
@@ -236,7 +267,7 @@ const CompanyProfilePage = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-navy text-white font-semibold py-4 rounded-xl hover:bg-navy-light transition-colors text-sm disabled:opacity-70">
+              className="w-full bg-navy text-white font-semibold py-4 rounded-xl hover:bg-navy-light transition-colors text-sm disabled:opacity-70 shadow-sm">
               {isLoading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
@@ -272,7 +303,7 @@ const CompanyProfilePage = () => {
                 </p>
                 {profile?.verificationStatus === 'VERIFIED' ? (
                   <span className="bg-teal text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                    ✓ VERIFIED
+                    <Check className="w-3 h-3" /> VERIFIED
                   </span>
                 ) : (
                   <span className="bg-amber-100 text-amber-600 text-xs font-bold px-3 py-1 rounded-full">
@@ -299,17 +330,17 @@ const CompanyProfilePage = () => {
               </p>
               <div className="space-y-3">
                 {[
-                  { icon: '💼', label: 'Active Listings', value: jobCount },
-                  { icon: '👥', label: 'Applications', value: totalApps.toLocaleString() },
+                  { icon: <Briefcase className="w-4 h-4 text-gray-400" />, label: 'Active Listings', value: jobCount },
+                  { icon: <Users className="w-4 h-4 text-gray-400" />, label: 'Applications', value: totalApps.toLocaleString() },
                   {
-                    icon: '📅',
+                    icon: <Calendar className="w-4 h-4 text-gray-400" />,
                     label: 'Member Since',
-                    value: new Date(user?.studentProfile as any ?? Date.now()).getFullYear() || '2024',
+                    value: (user as any)?.createdAt ? new Date((user as any).createdAt).getFullYear() : '2026',
                   },
                 ].map((stat) => (
                   <div key={stat.label} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm">{stat.icon}</span>
+                      {stat.icon}
                       <span className="text-xs text-gray-500">{stat.label}</span>
                     </div>
                     <span className="text-sm font-bold text-navy">{stat.value}</span>
