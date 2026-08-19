@@ -13,8 +13,7 @@ const CompanyNavbar = ({ sidebarCollapsed }: { sidebarCollapsed?: boolean }) => 
       }}>
 
       {/* Mini logo */}
-      <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-        <span className="text-navy text-xs font-bold">UI</span>
+      <div className="flex items-center justify-center">
       </div>
 
       {/* Right */}

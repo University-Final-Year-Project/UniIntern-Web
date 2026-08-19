@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Briefcase,
   Users,
-  BarChart2,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -15,7 +14,6 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
   { icon: Briefcase, label: 'My Listings', path: '/listings' },
   { icon: Users, label: 'Candidates', path: '/candidates' },
-  { icon: BarChart2, label: 'Analytics', path: '/analytics' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ];
 
