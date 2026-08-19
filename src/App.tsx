@@ -31,11 +31,13 @@ import CompanyLayout from './components/common/CompanyLayout';
 import CompanyDashboardPage from './pages/company/CompanyDashboardPage';
 
 // Admin pages
+import AdminLayout from './components/common/AdminLayout';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminStudentsPage from './pages/admin/AdminStudentsPage';
 import AdminCompaniesPage from './pages/admin/AdminCompaniesPage';
 import AdminJobsPage from './pages/admin/AdminJobsPage';
 import AdminApplicationsPage from './pages/admin/AdminApplicationsPage';
+import AdminLoginPage from './pages/auth/AdminLoginPage';
 
 function App() {
   const { user, isLoading } = useAuth();
@@ -59,6 +61,7 @@ function App() {
           <Route path="/student/register" element={<StudentRegisterPage />} />
           <Route path="/company/login" element={<CompanyLoginPage />} />
           <Route path="/company/register" element={<CompanyRegisterPage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </>
       )}
@@ -94,14 +97,14 @@ function App() {
 
       {/* Admin routes */}
       {user?.role === 'ADMIN' && (
-        <>
+        <Route element={<AdminLayout />}>
           <Route path="/" element={<AdminDashboardPage />} />
           <Route path="/students" element={<AdminStudentsPage />} />
           <Route path="/companies" element={<AdminCompaniesPage />} />
           <Route path="/jobs" element={<AdminJobsPage />} />
           <Route path="/applications" element={<AdminApplicationsPage />} />
           <Route path="*" element={<Navigate to="/" />} />
-        </>
+        </Route>
       )}
     </Routes>
   );
