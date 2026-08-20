@@ -20,9 +20,17 @@ type FilterType = 'ALL' | 'VERIFIED' | 'PENDING' | 'REJECTED';
 
 const statusBadge = (status: string) => {
   if (status === 'VERIFIED') return 'bg-teal text-white';
-  if (status === 'PENDING') return 'bg-amber-400 text-white';
-  return 'bg-red-500 text-white';
+  if (status === 'PENDING' || status === 'UNVERIFIED') return 'bg-amber-400 text-white';
+  if (status === 'REJECTED') return 'bg-red-500 text-white';
+  return 'bg-gray-200 text-gray-600';
 };
+
+const statusLabel = (status: string) => {
+  if (status === 'UNVERIFIED') return 'PENDING';
+  return status;
+};
+
+const isPending = (status: string) => ['PENDING', 'UNVERIFIED'].includes(status);
 
 const ITEMS_PER_PAGE = 10;
 
@@ -52,8 +60,11 @@ const AdminStudentsPage = () => {
             : s,
         ),
       );
-    } catch { alert('Failed to update verification.'); }
-    finally { setUpdatingId(null); }
+    } catch {
+      alert('Failed to update verification.');
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const handleToggleActive = async (userId: string, isActive: boolean) => {
@@ -63,18 +74,29 @@ const AdminStudentsPage = () => {
       setStudents((prev) =>
         prev.map((s) => s.id === userId ? { ...s, isActive: !isActive } : s),
       );
-    } catch { alert('Failed to update status.'); }
-    finally { setUpdatingId(null); }
+    } catch {
+      alert('Failed to update status.');
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const filtered = students.filter((s) => {
     const matchesSearch =
       !search ||
-      `${s.studentProfile?.firstName} ${s.studentProfile?.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
+      `${s.studentProfile?.firstName} ${s.studentProfile?.lastName}`
+        .toLowerCase()
+        .includes(search.toLowerCase()) ||
       s.email.toLowerCase().includes(search.toLowerCase()) ||
       s.studentProfile?.university?.toLowerCase().includes(search.toLowerCase());
+
+    const status = s.studentProfile?.verificationStatus ?? '';
     const matchesFilter =
-      filter === 'ALL' || s.studentProfile?.verificationStatus === filter;
+      filter === 'ALL' ||
+      (filter === 'PENDING' && isPending(status)) ||
+      (filter === 'VERIFIED' && status === 'VERIFIED') ||
+      (filter === 'REJECTED' && status === 'REJECTED');
+
     return matchesSearch && matchesFilter;
   });
 
@@ -84,7 +106,7 @@ const AdminStudentsPage = () => {
   const filterCounts = {
     ALL: students.length,
     VERIFIED: students.filter((s) => s.studentProfile?.verificationStatus === 'VERIFIED').length,
-    PENDING: students.filter((s) => s.studentProfile?.verificationStatus === 'PENDING').length,
+    PENDING: students.filter((s) => isPending(s.studentProfile?.verificationStatus ?? '')).length,
     REJECTED: students.filter((s) => s.studentProfile?.verificationStatus === 'REJECTED').length,
   };
 
@@ -92,13 +114,11 @@ const AdminStudentsPage = () => {
     <div className="max-w-7xl mx-auto px-8 py-8">
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-navy mb-1">Student Management</h1>
-          <p className="text-sm text-gray-400">
-            Manage all registered students and their verification status.
-          </p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-navy mb-1">Student Management</h1>
+        <p className="text-sm text-gray-400">
+          Manage all registered students and their verification status.
+        </p>
       </div>
 
       {/* Search + Filters */}
@@ -121,19 +141,19 @@ const AdminStudentsPage = () => {
             <button
               key={f}
               onClick={() => { setFilter(f); setPage(1); }}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 ${
                 filter === f
                   ? 'bg-navy text-white'
                   : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}>
               {f === 'ALL' ? 'ALL STUDENTS' : f}
+              <span className={`text-[10px] ${filter === f ? 'text-white/70' : 'text-gray-400'}`}>
+                ({filterCounts[f]})
+              </span>
               {f === 'PENDING' && filterCounts.PENDING > 0 && (
-                <span className="ml-1.5 bg-amber-400 text-white text-[9px] px-1.5 py-0.5 rounded-full">
-                  {filterCounts.PENDING}
+                <span className="bg-amber-400 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-0.5">
+                  !
                 </span>
-              )}
-              {f !== 'PENDING' && (
-                <span className="ml-1.5 text-gray-400">({filterCounts[f]})</span>
               )}
             </button>
           ))}
@@ -146,7 +166,9 @@ const AdminStudentsPage = () => {
           <thead className="border-b border-gray-100">
             <tr>
               {['Student Details', 'Academic Info', 'Status', 'Joined Date', 'Actions'].map((h) => (
-                <th key={h} className="text-left text-xs font-semibold text-gray-400 px-6 py-4">
+                <th
+                  key={h}
+                  className="text-left text-xs font-semibold text-gray-400 px-6 py-4">
                   {h}
                 </th>
               ))}
@@ -168,10 +190,13 @@ const AdminStudentsPage = () => {
             ) : (
               paginated.map((s) => {
                 const p = s.studentProfile;
-                const status = p?.verificationStatus ?? 'PENDING';
+                const status = p?.verificationStatus ?? 'UNVERIFIED';
                 const initials = `${p?.firstName?.charAt(0) ?? ''}${p?.lastName?.charAt(0) ?? ''}`;
+
                 return (
-                  <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                  <tr
+                    key={s.id}
+                    className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-navy flex items-center justify-center flex-shrink-0">
@@ -190,26 +215,29 @@ const AdminStudentsPage = () => {
                       <p className="text-[10px] text-gray-400">{p?.courseOfStudy ?? '—'}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${statusBadge(status)}`}>
-                        {status}
+                      <span
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${statusBadge(status)}`}>
+                        {statusLabel(status)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-xs text-gray-500">
                         {new Date(s.createdAt).toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric', year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
                         })}
                       </p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        {status === 'PENDING' && (
+                        {isPending(status) && (
                           <>
                             <button
                               onClick={() => handleVerify(s.id, 'VERIFIED')}
                               disabled={updatingId === s.id}
                               className="bg-teal text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-teal-dark transition-colors disabled:opacity-50">
-                              Verify
+                              {updatingId === s.id ? '...' : 'Verify'}
                             </button>
                             <button
                               onClick={() => handleVerify(s.id, 'REJECTED')}
@@ -223,8 +251,16 @@ const AdminStudentsPage = () => {
                           <button
                             onClick={() => handleVerify(s.id, 'VERIFIED')}
                             disabled={updatingId === s.id}
-                            className="border border-gray-200 text-gray-500 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
-                            Review
+                            className="bg-teal text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-teal-dark transition-colors disabled:opacity-50">
+                            {updatingId === s.id ? '...' : 'Verify'}
+                          </button>
+                        )}
+                        {status === 'VERIFIED' && (
+                          <button
+                            onClick={() => handleVerify(s.id, 'REJECTED')}
+                            disabled={updatingId === s.id}
+                            className="border border-red-200 text-red-500 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50">
+                            Revoke
                           </button>
                         )}
                         <button

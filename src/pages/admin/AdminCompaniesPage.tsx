@@ -18,9 +18,17 @@ type FilterType = 'ALL' | 'VERIFIED' | 'PENDING' | 'REJECTED';
 
 const statusBadge = (status: string) => {
   if (status === 'VERIFIED') return 'bg-teal text-white';
-  if (status === 'PENDING') return 'bg-amber-400 text-white';
-  return 'bg-red-500 text-white';
+  if (status === 'PENDING' || status === 'UNVERIFIED') return 'bg-amber-400 text-white';
+  if (status === 'REJECTED') return 'bg-red-500 text-white';
+  return 'bg-gray-200 text-gray-600';
 };
+
+const statusLabel = (status: string) => {
+  if (status === 'UNVERIFIED') return 'PENDING';
+  return status;
+};
+
+const isPending = (status: string) => ['PENDING', 'UNVERIFIED'].includes(status);
 
 const ITEMS_PER_PAGE = 10;
 
@@ -50,8 +58,11 @@ const AdminCompaniesPage = () => {
             : c,
         ),
       );
-    } catch { alert('Failed to update verification.'); }
-    finally { setUpdatingId(null); }
+    } catch {
+      alert('Failed to update verification.');
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const handleToggleActive = async (userId: string, isActive: boolean) => {
@@ -61,8 +72,11 @@ const AdminCompaniesPage = () => {
       setCompanies((prev) =>
         prev.map((c) => c.id === userId ? { ...c, isActive: !isActive } : c),
       );
-    } catch { alert('Failed to update status.'); }
-    finally { setUpdatingId(null); }
+    } catch {
+      alert('Failed to update status.');
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const filtered = companies.filter((c) => {
@@ -71,8 +85,14 @@ const AdminCompaniesPage = () => {
       c.companyProfile?.companyName?.toLowerCase().includes(search.toLowerCase()) ||
       c.email.toLowerCase().includes(search.toLowerCase()) ||
       c.companyProfile?.industry?.toLowerCase().includes(search.toLowerCase());
+
+    const status = c.companyProfile?.verificationStatus ?? '';
     const matchesFilter =
-      filter === 'ALL' || c.companyProfile?.verificationStatus === filter;
+      filter === 'ALL' ||
+      (filter === 'PENDING' && isPending(status)) ||
+      (filter === 'VERIFIED' && status === 'VERIFIED') ||
+      (filter === 'REJECTED' && status === 'REJECTED');
+
     return matchesSearch && matchesFilter;
   });
 
@@ -82,7 +102,7 @@ const AdminCompaniesPage = () => {
   const filterCounts = {
     ALL: companies.length,
     VERIFIED: companies.filter((c) => c.companyProfile?.verificationStatus === 'VERIFIED').length,
-    PENDING: companies.filter((c) => c.companyProfile?.verificationStatus === 'PENDING').length,
+    PENDING: companies.filter((c) => isPending(c.companyProfile?.verificationStatus ?? '')).length,
     REJECTED: companies.filter((c) => c.companyProfile?.verificationStatus === 'REJECTED').length,
   };
 
@@ -90,11 +110,9 @@ const AdminCompaniesPage = () => {
     <div className="max-w-7xl mx-auto px-8 py-8">
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-navy mb-1">Company Management</h1>
-          <p className="text-sm text-gray-400">Manage all registered companies.</p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-navy mb-1">Company Management</h1>
+        <p className="text-sm text-gray-400">Manage all registered companies.</p>
       </div>
 
       {/* Search + Filters */}
@@ -117,19 +135,19 @@ const AdminCompaniesPage = () => {
             <button
               key={f}
               onClick={() => { setFilter(f); setPage(1); }}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 ${
                 filter === f
                   ? 'bg-navy text-white'
                   : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}>
               {f}
+              <span className={`text-[10px] ${filter === f ? 'text-white/70' : 'text-gray-400'}`}>
+                ({filterCounts[f]})
+              </span>
               {f === 'PENDING' && filterCounts.PENDING > 0 && (
-                <span className="ml-1.5 bg-amber-400 text-white text-[9px] px-1.5 py-0.5 rounded-full">
-                  {filterCounts.PENDING}
+                <span className="bg-amber-400 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-0.5">
+                  !
                 </span>
-              )}
-              {f !== 'PENDING' && (
-                <span className="ml-1.5 text-gray-400">({filterCounts[f]})</span>
               )}
             </button>
           ))}
@@ -164,7 +182,7 @@ const AdminCompaniesPage = () => {
             ) : (
               paginated.map((c) => {
                 const p = c.companyProfile;
-                const status = p?.verificationStatus ?? 'PENDING';
+                const status = p?.verificationStatus ?? 'UNVERIFIED';
                 return (
                   <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
@@ -187,7 +205,7 @@ const AdminCompaniesPage = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${statusBadge(status)}`}>
-                        {status}
+                        {statusLabel(status)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -199,13 +217,13 @@ const AdminCompaniesPage = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        {status === 'PENDING' && (
+                        {isPending(status) && (
                           <>
                             <button
                               onClick={() => handleVerify(c.id, 'VERIFIED')}
                               disabled={updatingId === c.id}
                               className="bg-teal text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-teal-dark transition-colors disabled:opacity-50">
-                              Verify
+                              {updatingId === c.id ? '...' : 'Verify'}
                             </button>
                             <button
                               onClick={() => handleVerify(c.id, 'REJECTED')}
@@ -219,8 +237,16 @@ const AdminCompaniesPage = () => {
                           <button
                             onClick={() => handleVerify(c.id, 'VERIFIED')}
                             disabled={updatingId === c.id}
-                            className="border border-gray-200 text-gray-500 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
-                            Review
+                            className="bg-teal text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-teal-dark transition-colors disabled:opacity-50">
+                            {updatingId === c.id ? '...' : 'Verify'}
+                          </button>
+                        )}
+                        {status === 'VERIFIED' && (
+                          <button
+                            onClick={() => handleVerify(c.id, 'REJECTED')}
+                            disabled={updatingId === c.id}
+                            className="border border-red-200 text-red-500 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50">
+                            Revoke
                           </button>
                         )}
                         <button
