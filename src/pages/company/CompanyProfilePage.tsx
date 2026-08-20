@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { uploadImageToCloudinary } from '../../services/cloudinaryService';
 import { 
   Building2, 
   MapPin, 
@@ -46,6 +47,8 @@ const CompanyProfilePage = () => {
   const [location, setLocation] = useState(profile?.location ?? '');
   const [email] = useState(user?.email ?? '');
   const [isLoading, setIsLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState(profile?.logoUrl ?? '');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [jobCount, setJobCount] = useState(0);
@@ -72,6 +75,24 @@ const CompanyProfilePage = () => {
   };
 
   const percent = completion();
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingLogo(true);
+      const url = await uploadImageToCloudinary(file, 'avatars');
+      setLogoUrl(url);
+      const res = await api.patch('/auth/company/profile', { logoUrl: url });
+      const updatedUser = res.data.data;
+      const token = localStorage.getItem('token') ?? '';
+      setAuth(updatedUser, token);
+    } catch (err: any) {
+      alert(err.message ?? 'Failed to upload logo.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,26 +124,56 @@ const CompanyProfilePage = () => {
       {/* Cover Banner */}
       <div className="h-40 rounded-2xl bg-gradient-to-r from-navy to-navy-light relative overflow-hidden mb-0">
         <div
-          className="absolute inset-0 opacity-20 bg-cover bg-center"
+          className="absolute inset-0 opacity-20"
           style={{
             backgroundImage: 'url(https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1200&q=80)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
           }}
         />
-        <button 
-          type="button" 
-          className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 backdrop-blur-sm"
-        >
-          <Pencil className="w-3.5 h-3.5" /> Edit Cover
-        </button>
+        <label className="absolute top-4 right-4 cursor-pointer">
+          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            try {
+              const url = await uploadImageToCloudinary(file, 'covers');
+              await api.patch('/auth/company/profile', { logoUrl: url });
+            } catch (err: any) {
+              alert(err.message ?? 'Failed to upload cover.');
+            }
+          }} />
+          <span className="bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-white/30 transition-colors flex items-center gap-1.5 cursor-pointer">
+            ✎ Edit Cover
+          </span>
+        </label>
       </div>
 
       {/* Company Header */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-5 -mt-10 mb-8 px-2 relative z-10">
-        <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center flex-shrink-0">
-          <span className="text-navy text-3xl font-bold">
-            {companyName?.charAt(0) ?? 'C'}
-          </span>
-        </div>
+        <label className="cursor-pointer flex-shrink-0">
+          <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+          <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center overflow-hidden relative group">
+            {uploadingLogo ? (
+              <div className="w-5 h-5 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+            ) : logoUrl ? (
+              <>
+                <img src={logoUrl} alt="logo" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span className="text-white text-xs font-semibold">Change</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="text-navy text-3xl font-bold">
+                  {companyName?.charAt(0) ?? 'C'}
+                </span>
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span className="text-white text-xs font-semibold">Upload</span>
+                </div>
+              </>
+            )}
+          </div>
+        </label>
         <div className="flex-1 pb-1">
           <h1 className="text-2xl font-bold text-navy">{companyName || 'Company Name'}</h1>
           <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mt-1">
