@@ -99,8 +99,18 @@ const PostJobPage = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-6">
+        <div className={`border text-sm px-4 py-3 rounded-xl mb-6 ${
+          error.includes('verified')
+            ? 'bg-amber-50 border-amber-200 text-amber-700'
+            : 'bg-red-50 border-red-200 text-red-600'
+        }`}>
+          {error.includes('verified') && <span className="font-bold">⚠️ Verification Required — </span>}
           {error}
+          {error.includes('verified') && (
+            <p className="mt-1 text-xs">
+              Please contact the UniIntern admin team to verify your company account.
+            </p>
+          )}
         </div>
       )}
 
