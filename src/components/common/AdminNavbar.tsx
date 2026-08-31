@@ -1,3 +1,5 @@
+import { Bell } from 'lucide-react';
+
 const AdminNavbar = () => {
   return (
     <nav
@@ -7,8 +9,8 @@ const AdminNavbar = () => {
       </div>
       <div className="flex items-center gap-4">
         <button className="relative text-gray-400 hover:text-navy transition-colors">
-          <span className="text-xl">🔔</span>
-          <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+          <Bell className="w-5 h-5" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
         </button>
         <div className="flex items-center gap-3 border-l border-gray-100 pl-4">
           <div className="text-right">

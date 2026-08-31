@@ -23,6 +23,7 @@ export interface CompanyProfile {
   website: string | null;
   location: string | null;
   logoUrl: string | null;
+  coverUrl: string | null;
   verificationStatus: string;
 }
 

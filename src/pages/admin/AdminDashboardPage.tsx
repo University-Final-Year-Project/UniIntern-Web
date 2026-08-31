@@ -5,7 +5,6 @@ import {
   Building2,
   Briefcase,
   ClipboardList,
-  AlertCircle,
 } from 'lucide-react';
 import api from '../../services/api';
 
@@ -120,7 +119,7 @@ const AdminDashboardPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-8">
         <div className="bg-navy rounded-2xl p-5 col-span-1">
           <div className="flex justify-between items-start mb-3">
             <p className="text-xs font-medium text-white/70 uppercase tracking-wide">
@@ -153,23 +152,6 @@ const AdminDashboardPage = () => {
             </div>
           );
         })}
-
-        <div className="bg-amber-400 rounded-2xl p-5">
-          <div className="flex justify-between items-start mb-3">
-            <p className="text-xs font-medium text-white/80 uppercase tracking-wide">
-              Pending Verifications
-            </p>
-            <AlertCircle className="w-5 h-5 text-white" />
-          </div>
-          <p className="text-3xl font-bold text-white mb-3">
-            {stats?.pendingVerifications ?? 0}
-          </p>
-          <button
-            onClick={() => navigate('/students')}
-            className="bg-white text-amber-500 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition-colors">
-            Review Queue
-          </button>
-        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

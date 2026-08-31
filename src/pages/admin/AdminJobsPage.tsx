@@ -95,7 +95,7 @@ const AdminJobsPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
           <div className="flex justify-between items-start mb-3">
             <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
@@ -114,28 +114,6 @@ const AdminJobsPage = () => {
             <Users className="w-5 h-5 text-gray-300" />
           </div>
           <p className="text-3xl font-bold text-navy">{totalApplicants.toLocaleString()}</p>
-        </div>
-
-        {/* Application Volume Trend */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-              Application Volume Trends
-            </p>
-          </div>
-          <svg viewBox="0 0 200 50" className="w-full h-12">
-            {trendHeights.map((v, i) => (
-              <rect
-                key={i}
-                x={i * 28 + 2}
-                y={50 - v}
-                width="22"
-                height={v}
-                rx="3"
-                fill={i === 6 ? '#1a2b4a' : '#d1d5db'}
-              />
-            ))}
-          </svg>
         </div>
       </div>
 

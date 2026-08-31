@@ -48,6 +48,7 @@ const CompanyProfilePage = () => {
   const [email] = useState(user?.email ?? '');
   const [isLoading, setIsLoading] = useState(false);
   const [logoUrl, setLogoUrl] = useState(profile?.logoUrl ?? '');
+  const [coverUrl, setCoverUrl] = useState(profile?.coverUrl ?? '');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -122,13 +123,14 @@ const CompanyProfilePage = () => {
     <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8">
 
       {/* Cover Banner */}
-      <div className="h-40 rounded-2xl bg-gradient-to-r from-navy to-navy-light relative overflow-hidden mb-0">
-        <div
-          className="absolute inset-0 opacity-20"
+      <div className="h-56 rounded-2xl bg-gradient-to-r from-navy to-navy-light relative overflow-hidden mb-0">        <div
+          className="absolute inset-0"
           style={{
-            backgroundImage: 'url(https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1200&q=80)',
+            backgroundImage: `url(${coverUrl || 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1200&q=80'})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: coverUrl ? 1 : 0.2,
           }}
         />
         <label className="absolute top-4 right-4 cursor-pointer">
@@ -137,7 +139,12 @@ const CompanyProfilePage = () => {
             if (!file) return;
             try {
               const url = await uploadImageToCloudinary(file, 'covers');
-              await api.patch('/auth/company/profile', { logoUrl: url });
+              setCoverUrl(url);
+              await api.patch('/auth/company/profile', { coverUrl: url });
+              const res = await api.patch('/auth/company/profile', { coverUrl: url });
+              const updatedUser = res.data.data;
+              const token = localStorage.getItem('token') ?? '';
+              setAuth(updatedUser, token);
             } catch (err: any) {
               alert(err.message ?? 'Failed to upload cover.');
             }
@@ -152,13 +159,11 @@ const CompanyProfilePage = () => {
       <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-5 -mt-10 mb-8 px-2 relative z-10">
         <label className="cursor-pointer flex-shrink-0">
           <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
-          <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center overflow-hidden relative group">
-            {uploadingLogo ? (
+          <div className="w-28 h-28 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center overflow-hidden relative group" style={{ aspectRatio: '1/1' }}>            {uploadingLogo ? (
               <div className="w-5 h-5 border-2 border-navy border-t-transparent rounded-full animate-spin" />
             ) : logoUrl ? (
               <>
-                <img src={logoUrl} alt="logo" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <img src={logoUrl} alt="logo" className="w-full h-full" style={{ objectFit: 'cover', width: '100%', height: '100%' }} />                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <span className="text-white text-xs font-semibold">Change</span>
                 </div>
               </>
@@ -196,7 +201,7 @@ const CompanyProfilePage = () => {
           onClick={handleSave}
           disabled={isLoading}
           className="bg-navy text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-navy-light transition-colors flex items-center justify-center gap-2 disabled:opacity-70 self-start sm:self-end">
-          <Pencil className="w-4 h-4" /> {isLoading ? 'Saving...' : 'Edit Profile'}
+          <Pencil className="w-4 h-4" /> {isLoading ? 'Saving...' : 'Save'}
         </button>
       </div>
 
