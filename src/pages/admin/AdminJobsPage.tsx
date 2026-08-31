@@ -69,20 +69,6 @@ const AdminJobsPage = () => {
   const activeCount = jobs.filter((j) => j.isActive).length;
   const inactiveCount = jobs.filter((j) => !j.isActive).length;
 
-  // Build trend data from jobs created per day (last 7 days)
-  const trendData = Array.from({ length: 7 }, (_, i) => {
-    const day = new Date();
-    day.setDate(day.getDate() - (6 - i));
-    day.setHours(0, 0, 0, 0);
-    return jobs.filter((j) => {
-      const created = new Date(j.createdAt);
-      created.setHours(0, 0, 0, 0);
-      return created.getTime() === day.getTime();
-    }).length;
-  });
-  const maxTrend = Math.max(...trendData, 1);
-  const trendHeights = trendData.map((v) => Math.round((v / maxTrend) * 40) + 5);
-
   return (
     <div className="max-w-7xl mx-auto px-8 py-8">
 

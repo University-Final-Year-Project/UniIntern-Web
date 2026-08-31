@@ -86,9 +86,6 @@ const StudentDashboardPage: React.FC = () => {
       setApplications(fetchedApps);
       setMatchScores(scoresMap);
 
-      console.log('scoresMap:', scoresMap);
-      console.log('fetchedJobs ids:', fetchedJobs.map(j => j.id));
-
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
       setHasError(true);
