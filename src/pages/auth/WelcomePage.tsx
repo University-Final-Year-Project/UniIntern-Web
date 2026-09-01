@@ -31,7 +31,7 @@ const WelcomePage = () => {
         <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
           <div className="max-w-2xl">
             <div className="inline-block bg-teal/20 border border-teal/40 text-teal text-xs font-semibold px-3 py-1.5 rounded-full mb-6 tracking-wide">
-              NOW LIVE: SUMMER 2026 COHORT
+              NOW LIVE: 2026 
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-white leading-tight mb-6">
               Bridge the gap between{' '}
