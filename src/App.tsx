@@ -65,10 +65,12 @@ function App() {
           <Route path="/company/register" element={<CompanyRegisterPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="*" element={<Navigate to="/" />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </>
       )}
+
+      {/* Always public - accessible regardless of auth state */}
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {user?.role === 'STUDENT' && (
         <Route element={<StudentLayout />}>
