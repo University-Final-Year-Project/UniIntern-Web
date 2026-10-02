@@ -142,9 +142,9 @@ const CompanyLoginPage = () => {
                   <label className="text-sm font-medium text-gray-700">
                     Password
                   </label>
-                  <a href="#" className="text-xs text-navy font-semibold hover:underline">
+                  <Link to="/forgot-password" className="text-xs text-navy font-semibold hover:underline">
                     Forgot Password?
-                  </a>
+                  </Link>
                 </div>
                 <div className="flex items-center border border-gray-200 rounded-xl px-4 py-3.5 gap-3 focus-within:border-navy transition-colors">
                   <input

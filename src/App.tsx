@@ -9,6 +9,8 @@ import StudentLoginPage from './pages/auth/StudentLoginPage';
 import StudentRegisterPage from './pages/auth/StudentRegisterPage';
 import CompanyLoginPage from './pages/auth/CompanyLoginPage';
 import CompanyRegisterPage from './pages/auth/CompanyRegisterPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 
 // Student pages
 import StudentDashboardPage from './pages/student/StudentDashboardPage';
@@ -63,6 +65,8 @@ function App() {
           <Route path="/company/register" element={<CompanyRegisterPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="*" element={<Navigate to="/" />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </>
       )}
 
