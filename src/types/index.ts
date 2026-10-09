@@ -96,3 +96,13 @@ export interface Pagination {
   hasNextPage: boolean;
   hasPrevPage: boolean;
 }
+
+export type MatchSource = 'AI' | 'FALLBACK';
+
+export interface MatchResult {
+  score: number;
+  reason: string;
+  source: MatchSource;
+  matchedSkills: string[];
+  missingSkills: string[];
+}

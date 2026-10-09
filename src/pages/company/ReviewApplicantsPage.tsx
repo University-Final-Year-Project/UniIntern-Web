@@ -11,7 +11,9 @@ import {
   BarChart2,
 } from 'lucide-react';
 import api from '../../services/api';
-import { getMatchScore } from '../../services/matchScoreCache';
+import { useApplicantScores } from '../../hooks/useMatchScores';
+import MatchBadge from '../../components/common/MatchBadge';
+import { averageScore, getMatchStyle } from '../../utils/matchScore';
 
 interface Applicant {
   id: string;
@@ -35,38 +37,6 @@ interface Applicant {
 
 type FilterType = 'ALL' | 'TOP' | 'REVIEW' | 'SHORTLISTED';
 
-const getScoreColor = (score: number) => {
-  if (score >= 85) return { ring: 'stroke-teal', text: 'text-teal', label: 'Strong Match', bg: 'bg-teal-light' };
-  if (score >= 70) return { ring: 'stroke-amber-400', text: 'text-amber-500', label: 'Good Fit', bg: 'bg-amber-50' };
-  return { ring: 'stroke-red-400', text: 'text-red-500', label: 'Partial Match', bg: 'bg-red-50' };
-};
-
-const ScoreCircle = ({ score }: { score: number }) => {
-  const { ring, text } = getScoreColor(score);
-  const r = 20;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (score / 100) * circ;
-
-  return (
-    <div className="relative w-14 h-14">
-      <svg className="w-14 h-14 -rotate-90" viewBox="0 0 50 50">
-        <circle cx="25" cy="25" r={r} fill="none" stroke="#e5e7eb" strokeWidth="4" />
-        <circle
-          cx="25" cy="25" r={r} fill="none"
-          className={ring}
-          strokeWidth="4"
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className={`text-xs font-bold ${text}`}>{score}%</span>
-      </div>
-    </div>
-  );
-};
-
 const ReviewApplicantsPage = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
@@ -76,7 +46,11 @@ const ReviewApplicantsPage = () => {
   const [filter, setFilter] = useState<FilterType>('ALL');
   const [sortBy, setSortBy] = useState('match');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [matchScores, setMatchScores] = useState<Record<string, number>>({});
+  const [jobIds, setJobIds] = useState<string[]>([]);
+
+  // Scores come from the server, worked out the same way the student sees them.
+  const getEntry = useApplicantScores(jobIds);
+  const getScore = (app: Applicant): number | undefined => getEntry(app.id).data?.score;
 
   useEffect(() => {
     const load = async () => {
@@ -90,6 +64,7 @@ const ReviewApplicantsPage = () => {
           ]);
           setJobTitle(jobRes.data.data.title);
           appsData = appsRes.data.data ?? [];
+          setJobIds([jobId]);
         } else {
           const jobsRes = await api.get('/jobs/company/my-jobs');
           const jobs = jobsRes.data.data ?? [];
@@ -101,22 +76,11 @@ const ReviewApplicantsPage = () => {
               ),
             );
             appsData = appsArrays.flat();
+            setJobIds(jobs.slice(0, 5).map((j: { id: string }) => j.id));
           }
         }
 
         setApplicants(appsData);
-
-        // Load real match scores for each applicant
-        appsData.forEach(async (app: Applicant) => {
-          if (!jobId) return;
-          try {
-            const { score } = await getMatchScore(jobId);
-            setMatchScores((prev) => ({ ...prev, [app.id]: score }));
-          } catch {
-            const fallback = Math.min(95, 60 + (app.student.studentProfile?.skills?.length ?? 0) * 5);
-            setMatchScores((prev) => ({ ...prev, [app.id]: fallback }));
-          }
-        });
       } catch (err) {
         console.error(err);
       } finally {
@@ -140,19 +104,16 @@ const ReviewApplicantsPage = () => {
     }
   };
 
-  const getScore = (app: Applicant) =>
-    matchScores[app.id] ?? Math.min(95, 60 + (app.student.studentProfile?.skills?.length ?? 0) * 5);
-
   const filteredApplicants = applicants
     .filter((a) => {
       const score = getScore(a);
-      if (filter === 'TOP') return score >= 85;
+      if (filter === 'TOP') return score !== undefined && score >= 85;
       if (filter === 'REVIEW') return a.status === 'PENDING';
       if (filter === 'SHORTLISTED') return a.status === 'SHORTLISTED';
       return true;
     })
     .sort((a, b) => {
-      if (sortBy === 'match') return getScore(b) - getScore(a);
+      if (sortBy === 'match') return (getScore(b) ?? -1) - (getScore(a) ?? -1);
       if (sortBy === 'date') return new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime();
       if (sortBy === 'name') {
         const nameA = `${a.student.studentProfile?.firstName} ${a.student.studentProfile?.lastName}`;
@@ -163,11 +124,9 @@ const ReviewApplicantsPage = () => {
     });
 
   const totalApplied = applicants.length;
-  const highMatches = applicants.filter((a) => getScore(a) >= 85).length;
+  const highMatches = applicants.filter((a) => (getScore(a) ?? -1) >= 85).length;
   const shortlistedCount = applicants.filter((a) => a.status === 'SHORTLISTED').length;
-  const avgScore = applicants.length > 0
-    ? Math.round(applicants.reduce((sum, a) => sum + getScore(a), 0) / applicants.length)
-    : 0;
+  const avgScore = averageScore(applicants.map(getScore));
 
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const day = new Date();
@@ -288,8 +247,9 @@ const ReviewApplicantsPage = () => {
           ) : (
             filteredApplicants.map((app, i) => {
               const profile = app.student.studentProfile;
-              const score = getScore(app);
-              const scoreStyle = getScoreColor(score);
+              const entry = getEntry(app.id);
+              const score = entry.data?.score;
+              const scoreStyle = score !== undefined ? getMatchStyle(score) : null;
               const color = avatarColors[i % avatarColors.length];
               const isShortlisted = app.status === 'SHORTLISTED';
               const isRejected = app.status === 'REJECTED';
@@ -335,27 +295,42 @@ const ReviewApplicantsPage = () => {
                     </div>
                   </div>
 
-                  {/* Match Score + AI Summary */}
+                  {/* Match Score + why */}
                   <div className="flex items-start gap-4 mb-4">
                     <div className="flex flex-col items-center">
-                      <ScoreCircle score={score} />
-                      <span className={`text-[10px] font-bold mt-1 ${scoreStyle.text}`}>
-                        {scoreStyle.label.toUpperCase()}
-                      </span>
+                      <MatchBadge entry={entry} variant="ring" size={56} />
+                      {scoreStyle && (
+                        <span className={`text-[10px] font-bold mt-1 ${scoreStyle.text}`}>
+                          {scoreStyle.label.toUpperCase()}
+                        </span>
+                      )}
                     </div>
-                    <div className={`flex-1 ${scoreStyle.bg} rounded-xl p-3`}>
+                    <div className={`flex-1 ${scoreStyle?.bg ?? 'bg-gray-50'} rounded-xl p-3`}>
                       <p className="text-[10px] font-bold text-teal-dark flex items-center gap-1 mb-1">
-                        <Sparkles className="w-3 h-3" /> AI CANDIDATE SUMMARY
+                        <Sparkles className="w-3 h-3" /> WHY THIS SCORE
                       </p>
                       <p className="text-xs text-gray-600 leading-5">
-                        {profile?.biography
-                          ? profile.biography.substring(0, 150) + '...'
-                          : `${profile?.firstName ?? 'This candidate'} demonstrates a skill profile aligned with ${
-                              (profile?.skills ?? []).slice(0, 2).join(' and ') || 'this role'
-                            }. Their background in ${
-                              profile?.courseOfStudy ?? 'their field'
-                            } makes them a ${scoreStyle.label.toLowerCase()} for this position.`}
+                        {entry.data
+                          ? entry.data.reason
+                          : entry.status === 'error'
+                            ? 'The match score is not available right now.'
+                            : 'Working out the match...'}
                       </p>
+                      {entry.data && (
+                        <p className="text-[11px] text-gray-500 leading-4 mt-1">
+                          {entry.data.matchedSkills.length > 0
+                            ? `Matches: ${entry.data.matchedSkills.join(', ')}.`
+                            : 'No required skills matched.'}
+                          {entry.data.missingSkills.length > 0 &&
+                            ` Missing: ${entry.data.missingSkills.join(', ')}.`}
+                        </p>
+                      )}
+                      {profile?.biography && (
+                        <p className="text-[11px] text-gray-400 leading-4 mt-1">
+                          About: {profile.biography.substring(0, 150)}
+                          {profile.biography.length > 150 ? '...' : ''}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -491,9 +466,15 @@ const ReviewApplicantsPage = () => {
               Avg Match Score
             </p>
             <div className="flex items-center gap-3">
-              <p className="text-3xl font-bold text-navy">{avgScore}%</p>
+              <p className="text-3xl font-bold text-navy">
+                {avgScore !== null
+                  ? `${avgScore}%`
+                  : applicants.some((a) => getEntry(a.id).status === 'loading')
+                    ? '...'
+                    : '—'}
+              </p>
               <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-teal rounded-full" style={{ width: `${avgScore}%` }} />
+                <div className="h-full bg-teal rounded-full" style={{ width: `${avgScore ?? 0}%` }} />
               </div>
             </div>
           </div>

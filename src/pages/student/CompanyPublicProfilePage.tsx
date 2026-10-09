@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../services/api';
 import { type Job } from '../../types';
+import { useJobScores } from '../../hooks/useMatchScores';
+import MatchBadge from '../../components/common/MatchBadge';
+import { averageScore } from '../../utils/matchScore';
 import {
   Building2,
   MapPin,
@@ -38,6 +41,10 @@ const CompanyPublicProfilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentJobIndex, setCurrentJobIndex] = useState(0);
 
+  // Your match for each of this company's internships, from the shared score store.
+  const scoredJobs = (company?.jobs ?? []).slice(0, 10);
+  const getScore = useJobScores(scoredJobs.map((job) => job.id));
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -66,6 +73,7 @@ const CompanyPublicProfilePage = () => {
   const jobs = company.jobs ?? [];
   const visibleJobs = jobs.slice(currentJobIndex, currentJobIndex + 2);
   const listJob = jobs[2];
+  const yourAverage = averageScore(scoredJobs.map((job) => getScore(job.id).data?.score));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -195,6 +203,9 @@ const CompanyPublicProfilePage = () => {
                             </span>
                           </div>
                           <h3 className="text-sm font-bold text-navy mb-1">{job.title}</h3>
+                          <div className="mb-2">
+                            <MatchBadge entry={getScore(job.id)} variant="pill" />
+                          </div>
                           <div className="flex items-center gap-3 text-xs text-gray-400 mb-4">
                             {job.location && (
                               <span className="flex items-center gap-1">
@@ -241,6 +252,7 @@ const CompanyPublicProfilePage = () => {
                             )}
                           </div>
                         </div>
+                        <MatchBadge entry={getScore(listJob.id)} variant="pill" />
                         <span
                           className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
                             listJob.type === 'REMOTE'
@@ -337,8 +349,8 @@ const CompanyPublicProfilePage = () => {
                     },
                     {
                       icon: <Star className="w-4 h-4 text-white/70" />,
-                      label: 'Avg Match Score',
-                      value: '—',
+                      label: 'Your Avg Match',
+                      value: yourAverage !== null ? `${yourAverage}%` : '—',
                     },
                   ].map((stat) => (
                     <div key={stat.label} className="flex items-center justify-between">

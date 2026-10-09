@@ -5,9 +5,9 @@ import {
   Clock,
   Calendar,
   Users,
-  // Sparkles,
+  Sparkles,
   Check,
-  // Circle,
+  Circle,
   GraduationCap,
   Wrench,
   Laptop,
@@ -22,7 +22,9 @@ import {
   ArrowRight
 } from 'lucide-react';
 import api from '../../services/api';
-import { getMatchScore } from '../../services/matchScoreCache';
+import { useJobScores } from '../../hooks/useMatchScores';
+import MatchBadge from '../../components/common/MatchBadge';
+import { describeSource, getMatchStyle } from '../../utils/matchScore';
 import { type Job } from '../../types';
 
 interface Application {
@@ -31,22 +33,18 @@ interface Application {
   jobPosting?: { id: string };
 }
 
-interface MatchResponse {
-  score: number;
-  reason: string;
-}
-
 const JobDetailPage = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
 
   const [job, setJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [, setMatchScore] = useState<number | null>(null);
-  const [, setMatchReason] = useState('');
   const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
-  const [similarScores, setSimilarScores] = useState<Record<string, number>>({});
+
+  // The score for this job and for the similar jobs, from the same shared store
+  // the feed and dashboard use, so the numbers always agree.
+  const getScore = useJobScores(jobId ? [jobId, ...similarJobs.map((j) => j.id)] : []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -77,29 +75,6 @@ const JobDetailPage = () => {
 
         const similar = allJobs.filter((j: Job) => j.id !== jobId).slice(0, 3);
         setSimilarJobs(similar);
-
-        // Load scores for similar jobs
-        similar.forEach(async (j: Job) => {
-          try {
-            const { score } = await getMatchScore(j.id);
-            setSimilarScores((prev) => ({ ...prev, [j.id]: score }));
-          } catch {
-            setSimilarScores((prev) => ({ ...prev, [j.id]: 0 }));
-          }
-        });
-
-        // Fetch match breakdown after validating job existence
-        try {
-          const scoreRes = await api.get<{ data: MatchResponse }>(`/jobs/${jobId}/match`, {
-            signal: controller.signal,
-          });
-          if (scoreRes.data?.data) {
-            setMatchScore(scoreRes.data.data.score);
-            setMatchReason(scoreRes.data.data.reason);
-          }
-        } catch (matchErr) {
-          console.warn('Match score unavailable:', matchErr);
-        }
       } catch (err: any) {
         if (err.name !== 'CanceledError') {
           console.error('Error fetching job details:', err);
@@ -116,6 +91,9 @@ const JobDetailPage = () => {
       controller.abort();
     };
   }, [jobId, navigate]);
+
+  const matchEntry = jobId ? getScore(jobId) : { status: 'idle' as const };
+  const match = matchEntry.data;
 
   if (isLoading) {
     return (
@@ -210,53 +188,65 @@ const JobDetailPage = () => {
               </div>
             </div>
 
-            {/* AI Match Breakdown
-            {matchScore !== null && (
+            {/* AI Match Breakdown */}
+            {matchEntry.status !== 'error' && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-navy rounded-xl flex items-center justify-center">
                       <Sparkles className="w-5 h-5 text-white" />
                     </div>
-                    <h2 className="text-lg font-bold text-navy">
-                      AI Match Breakdown
-                    </h2>
+                    <div>
+                      <h2 className="text-lg font-bold text-navy">AI Match Breakdown</h2>
+                      {match && (
+                        <p className={`text-xs font-semibold ${getMatchStyle(match.score).text}`}>
+                          {getMatchStyle(match.score).label}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-3xl font-bold text-navy">{matchScore}%</p>
-                    <p className="text-xs text-gray-400">Match Score</p>
+                    <MatchBadge entry={matchEntry} variant="ring" size={64} />
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs font-bold text-teal tracking-wide uppercase mb-2">
-                      Skills Match
-                    </p>
-                    <div className="space-y-2">
-                      {(job.skillsRequired ?? []).slice(0, 3).map((skill, i) => (
-                        <div key={skill} className="flex items-center gap-2">
-                          {i < 2 ? (
+                {match ? (
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs font-bold text-teal tracking-wide uppercase mb-2">
+                        Skills Match
+                      </p>
+                      <div className="space-y-2">
+                        {match.matchedSkills.map((skill) => (
+                          <div key={skill} className="flex items-center gap-2">
                             <Check className="w-4 h-4 text-teal" />
-                          ) : (
+                            <span className="text-sm text-gray-600">{skill}</span>
+                          </div>
+                        ))}
+                        {match.missingSkills.map((skill) => (
+                          <div key={skill} className="flex items-center gap-2">
                             <Circle className="w-3.5 h-3.5 text-gray-400" />
-                          )}
-                          <span className="text-sm text-gray-600">{skill}</span>
-                        </div>
-                      ))}
+                            <span className="text-sm text-gray-400">{skill}</span>
+                          </div>
+                        ))}
+                        {match.matchedSkills.length + match.missingSkills.length === 0 && (
+                          <p className="text-sm text-gray-400">This job does not list required skills.</p>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-blue-500 tracking-wide uppercase mb-2">
+                        AI Insight
+                      </p>
+                      <p className="text-sm text-gray-500 italic leading-5">"{match.reason}"</p>
+                      <p className="text-[11px] text-gray-400 mt-2">{describeSource(match.source)}</p>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-blue-500 tracking-wide uppercase mb-2">
-                      AI Insight
-                    </p>
-                    <p className="text-sm text-gray-500 italic leading-5">
-                      "{matchReason}"
-                    </p>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-gray-400">Working out your match...</p>
+                )}
               </div>
-            )} */}
+            )}
 
             {/* About the Role */}
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
@@ -365,8 +355,6 @@ const JobDetailPage = () => {
                 </div>
                 <div className="grid md:grid-cols-3 gap-4">
                   {similarJobs.map((sJob) => {
-                    const similarScore = similarScores[sJob.id];
-
                     return (
                       <div
                         key={sJob.id}
@@ -393,9 +381,7 @@ const JobDetailPage = () => {
                           {sJob.location ?? 'Remote'}
                         </p>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-teal">
-                            {similarScore !== undefined ? `${similarScore}% Match` : '...'}
-                          </span>
+                          <MatchBadge entry={getScore(sJob.id)} variant="pill" />
                           <Bookmark className="w-4 h-4 text-gray-300 hover:text-navy" />
                         </div>
                       </div>

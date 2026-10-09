@@ -14,7 +14,8 @@ import {
   Banknote,
 } from 'lucide-react';
 import api from '../../services/api';
-import { getMatchScore } from '../../services/matchScoreCache';
+import { useJobScores } from '../../hooks/useMatchScores';
+import MatchBadge from '../../components/common/MatchBadge';
 import { type Job, type Pagination } from '../../types';
 
 const CATEGORIES = [
@@ -34,7 +35,6 @@ const StudentFeedPage: React.FC = () => {
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [matchScores, setMatchScores] = useState<Record<string, number>>({});
 
   const [search, setSearch] = useState<string>('');
   const [location, setLocation] = useState<string>('');
@@ -46,6 +46,9 @@ const StudentFeedPage: React.FC = () => {
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [hasError, setHasError] = useState<boolean>(false);
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
+
+  // Scores for every job on screen, from the shared store used by all screens.
+  const getScore = useJobScores(jobs.map((job) => job.id));
 
   const loadJobs = useCallback(
     async (pageNum = 1, append = false) => {
@@ -75,23 +78,6 @@ const StudentFeedPage: React.FC = () => {
           setJobs(newJobs);
         }
         setPagination(newPagination);
-
-        // Load match scores using cache
-        newJobs.slice(0, 5).forEach(async (job) => {
-          if (matchScores[job.id] !== undefined) return;
-          try {
-            const { score } = await getMatchScore(job.id);
-            setMatchScores((prev) => {
-              if (prev[job.id] !== undefined) return prev;
-              return { ...prev, [job.id]: score };
-            });
-          } catch {
-            setMatchScores((prev) => {
-              if (prev[job.id] !== undefined) return prev;
-              return { ...prev, [job.id]: 0 };
-            });
-          }
-        });
       } catch (err) {
         console.error('Failed to load feed jobs:', err);
         setHasError(true);
@@ -132,12 +118,6 @@ const StudentFeedPage: React.FC = () => {
       else next.add(jobId);
       return next;
     });
-  };
-
-  const getScoreBadgeStyles = (score: number) => {
-    if (score >= 85) return 'text-emerald-700 border-emerald-200 bg-emerald-50';
-    if (score >= 70) return 'text-blue-700 border-blue-200 bg-blue-50';
-    return 'text-amber-700 border-amber-200 bg-amber-50';
   };
 
   return (
@@ -364,7 +344,6 @@ const StudentFeedPage: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {jobs.map((job) => {
-                  const score = matchScores[job.id];
                   const isBookmarked = bookmarks.has(job.id);
                   const companyName = job.company?.companyProfile?.companyName;
                   const daysAgo = Math.floor(
@@ -448,22 +427,7 @@ const StudentFeedPage: React.FC = () => {
                           />
                         </button>
 
-                        {score !== undefined ? (
-                          <div className="flex items-center sm:flex-col gap-2 text-center">
-                            <div
-                              className={`w-11 h-11 rounded-full border-2 flex items-center justify-center font-bold text-xs ${getScoreBadgeStyles(score)}`}>
-                              {score}%
-                            </div>
-                            <span className="text-[10px] font-bold text-navy flex items-center gap-0.5">
-                              <Sparkles className="w-3 h-3 text-blue-600" />
-                              Match
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="w-11 h-11 rounded-full border-2 border-gray-200 flex items-center justify-center">
-                            <div className="w-3 h-3 border-2 border-navy border-t-transparent rounded-full animate-spin" />
-                          </div>
-                        )}
+                        <MatchBadge entry={getScore(job.id)} variant="circle" caption />
 
                         <button
                           onClick={() => navigate(`/jobs/${job.id}`)}

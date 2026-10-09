@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { useApplicantScores } from '../../hooks/useMatchScores';
+import MatchBadge from '../../components/common/MatchBadge';
+import { averageScore } from '../../utils/matchScore';
 import {
   Briefcase,
   Users,
@@ -51,6 +54,8 @@ const CompanyDashboardPage = () => {
   const navigate = useNavigate();
   const profile = user?.companyProfile;
   const [applications, setApplications] = useState<Application[]>([]);
+  const [allApplications, setAllApplications] = useState<Application[]>([]);
+  const [scoredJobIds, setScoredJobIds] = useState<string[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -61,12 +66,16 @@ const CompanyDashboardPage = () => {
         const jobsData = jobsRes.data.data ?? [];
         setJobs(jobsData);
 
-        const appsPromises = jobsData.slice(0, 3).map((job: Job) =>
+        const dashboardJobs: Job[] = jobsData.slice(0, 3);
+        setScoredJobIds(dashboardJobs.map((job) => job.id));
+
+        const appsPromises = dashboardJobs.map((job: Job) =>
           api.get(`/applications/job/${job.id}`).then((r) => r.data.data ?? []),
         );
         const appsArrays = await Promise.all(appsPromises);
-        const allApps = appsArrays.flat().slice(0, 5);
-        setApplications(allApps);
+        const everyApp: Application[] = appsArrays.flat();
+        setAllApplications(everyApp);
+        setApplications(everyApp.slice(0, 5));
       } catch (err) {
         console.error(err);
       } finally {
@@ -79,9 +88,15 @@ const CompanyDashboardPage = () => {
   const totalApplicants = jobs.reduce((sum, j) => sum + j._count.applications, 0);
   const shortlisted = applications.filter((a) => a.status === 'SHORTLISTED').length;
 
-  const topMatches = applications
-  .filter((a) => a.student?.studentProfile)
-  .slice(0, 3);
+  // Match scores come from the server, the same numbers the students see.
+  const getEntry = useApplicantScores(scoredJobIds);
+  const avgScore = averageScore(allApplications.map((a) => getEntry(a.id).data?.score));
+  const anyLoading = allApplications.some((a) => getEntry(a.id).status === 'loading');
+
+  const topMatches = allApplications
+    .filter((a) => a.student?.studentProfile)
+    .sort((a, b) => (getEntry(b.id).data?.score ?? -1) - (getEntry(a.id).data?.score ?? -1))
+    .slice(0, 3);
 
   const trendData = [40, 55, 45, 60, 75, 65, 90];
 
@@ -123,7 +138,7 @@ const CompanyDashboardPage = () => {
           },
           {
             label: 'Avg Match Score',
-            value: '—',
+            value: avgScore !== null ? `${avgScore}%` : anyLoading ? '...' : '—',
             sub: null,
             icon: BarChart2,
             teal: true,
@@ -154,7 +169,7 @@ const CompanyDashboardPage = () => {
               )}
               {stat.teal && (
                 <div className="mt-3 h-1.5 bg-white/20 rounded-full overflow-hidden">
-                  <div className="h-full bg-white rounded-full w-[91%]" />
+                  <div className="h-full bg-white rounded-full" style={{ width: `${avgScore ?? 0}%` }} />
                 </div>
               )}
             </div>
@@ -287,6 +302,7 @@ const CompanyDashboardPage = () => {
                         {app.jobPosting?.title ?? 'Internship'}
                       </p>
                     </div>
+                    <MatchBadge entry={getEntry(app.id)} variant="pill" />
                   </div>
                 );
               })

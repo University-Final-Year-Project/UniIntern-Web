@@ -17,6 +17,9 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { type Job } from '../../types';
+import { useJobScores } from '../../hooks/useMatchScores';
+import MatchBadge from '../../components/common/MatchBadge';
+import { getMatchStyle } from '../../utils/matchScore';
 
 
 interface Document {
@@ -31,8 +34,6 @@ const ApplyJobPage = () => {
 
   const [job, setJob] = useState<Job | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [matchScore, setMatchScore] = useState<number | null>(null);
-  const [matchReason, setMatchReason] = useState('');
 
   const [coverNote, setCoverNote] = useState('');
   const [keyBullets, setKeyBullets] = useState('');
@@ -43,6 +44,11 @@ const ApplyJobPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  // Same score the feed, dashboard and job page show for this job.
+  const getScore = useJobScores(jobId ? [jobId] : []);
+  const matchEntry = jobId ? getScore(jobId) : { status: 'idle' as const };
+  const match = matchEntry.data;
 
   const cvInputRef = useRef<HTMLInputElement | null>(null);
   const letterInputRef = useRef<HTMLInputElement | null>(null);
@@ -57,14 +63,6 @@ const ApplyJobPage = () => {
 
         setJob(jobRes.data.data);
         setDocuments(docsRes.data.data ?? []);
-
-        try {
-          const scoreRes = await api.get(`/jobs/${jobId}/match`);
-          setMatchScore(scoreRes.data?.data?.score ?? null);
-          setMatchReason(scoreRes.data?.data?.reason ?? '');
-        } catch {
-          setMatchScore(null);
-        }
       } catch {
         navigate('/feed');
       } finally {
@@ -159,12 +157,6 @@ const ApplyJobPage = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 85) return '#00c896';
-    if (score >= 70) return '#f59e0b';
-    return '#ef4444';
   };
 
   if (isLoading) {
@@ -452,51 +444,45 @@ const ApplyJobPage = () => {
 
             {/* Sidebar */}
             <div className="space-y-5">
-              {matchScore !== null && (
+              {matchEntry.status !== 'error' && (
                 <div className="bg-navy rounded-2xl p-6 text-center">
                   <p className="text-xs font-bold text-white/50 tracking-widest uppercase mb-4">
                     Match Score
                   </p>
-                  <div className="relative w-32 h-32 mx-auto mb-4">
-                    <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
-                      <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="10" />
-                      <circle
-                        cx="60" cy="60" r="50" fill="none"
-                        stroke={getScoreColor(matchScore)}
-                        strokeWidth="10"
-                        strokeDasharray={`${2 * Math.PI * 50}`}
-                        strokeDashoffset={`${2 * Math.PI * 50 * (1 - matchScore / 100)}`}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-3xl font-bold text-white">{matchScore}%</span>
-                      <span className="text-xs text-white/50">
-                        {matchScore >= 85 ? 'Highly Qualified' : matchScore >= 70 ? 'Good Match' : 'Partial Match'}
+                  <div className="flex flex-col items-center mb-4">
+                    <MatchBadge entry={matchEntry} variant="ring" size={128} onDark />
+                    {match && (
+                      <span className="text-xs text-white/50 mt-2">
+                        {getMatchStyle(match.score).label}
+                        {match.source === 'FALLBACK' ? ' (estimated)' : ''}
                       </span>
-                    </div>
+                    )}
                   </div>
 
-                  <div className="space-y-3 text-left">
-                    <div className="bg-white/10 rounded-xl p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Target className="w-3.5 h-3.5 text-teal" />
-                        <p className="text-white text-xs font-bold">Skills Alignment</p>
+                  {match && (
+                    <div className="space-y-3 text-left">
+                      <div className="bg-white/10 rounded-xl p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Target className="w-3.5 h-3.5 text-teal" />
+                          <p className="text-white text-xs font-bold">Skills Alignment</p>
+                        </div>
+                        <p className="text-white/60 text-xs leading-4">
+                          {match.matchedSkills.length > 0
+                            ? `You match: ${match.matchedSkills.join(', ')}`
+                            : 'None of your listed skills match this job yet.'}
+                          {match.missingSkills.length > 0 &&
+                            ` Still to build: ${match.missingSkills.join(', ')}.`}
+                        </p>
                       </div>
-                      <p className="text-white/60 text-xs leading-4">
-                        {job.skillsRequired?.slice(0, 2).join(' & ') || 'Skills'} match detected
-                      </p>
-                    </div>
-                    <div className="bg-white/10 rounded-xl p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <GraduationCap className="w-3.5 h-3.5 text-teal" />
-                        <p className="text-white text-xs font-bold">Educational Fit</p>
+                      <div className="bg-white/10 rounded-xl p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <GraduationCap className="w-3.5 h-3.5 text-teal" />
+                          <p className="text-white text-xs font-bold">Educational Fit</p>
+                        </div>
+                        <p className="text-white/60 text-xs leading-4">{match.reason}</p>
                       </div>
-                      <p className="text-white/60 text-xs leading-4">
-                        {matchReason || 'Profile aligns with job requirements'}
-                      </p>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
-import { getMatchScore } from '../../services/matchScoreCache';
+import { useJobScores } from '../../hooks/useMatchScores';
+import MatchBadge from '../../components/common/MatchBadge';
 import { type Job, type Application } from '../../types';
 
 
@@ -40,10 +41,23 @@ const StudentDashboardPage: React.FC = () => {
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [matchScores, setMatchScores] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
   const hasFetched = useRef(false);
+
+  // Scores come from the shared store, the same numbers the feed and job page show.
+  const getScore = useJobScores(jobs.map((job) => job.id));
+
+  // Recommended matches are the best scoring jobs. We wait until every score has
+  // finished loading before sorting, so the cards do not jump around.
+  const recommended = useMemo(() => {
+    const entries = jobs.map((job) => ({ job, entry: getScore(job.id) }));
+    const settled = entries.every(({ entry }) => entry.status === 'ready' || entry.status === 'error');
+    if (!settled) return entries.slice(0, 2);
+    return [...entries]
+      .sort((a, b) => (b.entry.data?.score ?? -1) - (a.entry.data?.score ?? -1))
+      .slice(0, 2);
+  }, [jobs, getScore]);
 
 
   const loadData = useCallback(async () => {
@@ -52,7 +66,7 @@ const StudentDashboardPage: React.FC = () => {
 
     try {
       const [jobsRes, appsRes] = await Promise.allSettled([
-        api.get('/jobs?limit=4'),
+        api.get('/jobs?limit=6'),
         api.get('/applications/my-applications'),
       ]);
 
@@ -66,25 +80,8 @@ const StudentDashboardPage: React.FC = () => {
         fetchedApps = appsRes.value.data?.data ?? appsRes.value.data ?? [];
       }
 
-      // Load scores first, then set all state together
-      const scoreEntries = await Promise.allSettled(
-        fetchedJobs.map(async (job) => {
-          const { score } = await getMatchScore(job.id);
-          return { id: job.id, score };
-        })
-      );
-
-      const scoresMap: Record<string, number> = {};
-      scoreEntries.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          scoresMap[result.value.id] = result.value.score;
-        }
-      });
-
-      // Set all state at once so UI renders with scores already available
       setJobs(fetchedJobs);
       setApplications(fetchedApps);
-      setMatchScores(scoresMap);
 
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -281,8 +278,7 @@ const StudentDashboardPage: React.FC = () => {
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">
-                {jobs.slice(0, 2).map((job) => {
-                  const score = matchScores[job.id] ?? 0;
+                {recommended.map(({ job, entry }) => {
                   const companyName = job.company?.companyProfile?.companyName;
 
                   return (
@@ -294,10 +290,7 @@ const StudentDashboardPage: React.FC = () => {
                           <div className="w-10 h-10 rounded-xl bg-gray-100 border border-gray-200/60 flex items-center justify-center font-bold text-navy text-sm flex-shrink-0">
                             {companyName?.charAt(0) ?? 'C'}
                           </div>
-                          <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[11px] font-bold px-2.5 py-1 rounded-full border border-blue-100">
-                            <Zap className="w-3 h-3 text-blue-600 fill-blue-600" />
-                            {score}% Match
-                          </span>
+                          <MatchBadge entry={entry} variant="pill" />
                         </div>
 
                         <h3 className="text-sm font-bold text-navy line-clamp-1 mb-1">
@@ -416,6 +409,7 @@ const StudentDashboardPage: React.FC = () => {
 
               <div className="space-y-3 mb-5">
                 {jobs
+                  .slice(0, 4)
                   .filter((j) => j.deadline)
                   .slice(0, 3)
                   .map((job) => {
@@ -453,7 +447,7 @@ const StudentDashboardPage: React.FC = () => {
                     );
                   })}
 
-                {jobs.filter((j) => j.deadline).length === 0 && (
+                {jobs.slice(0, 4).filter((j) => j.deadline).length === 0 && (
                   <div className="text-center py-6 text-xs text-gray-400">
                     No urgent deadlines scheduled.
                   </div>
