@@ -7,10 +7,13 @@ import {
   GraduationCap,
   MoreHorizontal,
   Sparkles,
-  Check,
+  Mail,
   BarChart2,
 } from 'lucide-react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import ApplicantActions from '../../components/company/ApplicantActions';
+import { getStatusLabel } from '../../utils/applicationStatus';
 import { useApplicantScores } from '../../hooks/useMatchScores';
 import MatchBadge from '../../components/common/MatchBadge';
 import { averageScore, getMatchStyle } from '../../utils/matchScore';
@@ -20,8 +23,10 @@ interface Applicant {
   status: string;
   appliedAt: string;
   coverNote: string | null;
+  jobTitle?: string;
   student: {
     id: string;
+    email: string;
     studentProfile: {
       firstName: string;
       lastName: string;
@@ -35,11 +40,13 @@ interface Applicant {
   };
 }
 
-type FilterType = 'ALL' | 'TOP' | 'REVIEW' | 'SHORTLISTED';
+type FilterType = 'ALL' | 'TOP' | 'REVIEW' | 'SHORTLISTED' | 'SELECTED' | 'DECLINED';
 
 const ReviewApplicantsPage = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const companyName = user?.companyProfile?.companyName ?? 'our company';
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [jobTitle, setJobTitle] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -63,7 +70,10 @@ const ReviewApplicantsPage = () => {
             api.get(`/applications/job/${jobId}`),
           ]);
           setJobTitle(jobRes.data.data.title);
-          appsData = appsRes.data.data ?? [];
+          appsData = (appsRes.data.data ?? []).map((a: Applicant) => ({
+            ...a,
+            jobTitle: jobRes.data.data.title,
+          }));
           setJobIds([jobId]);
         } else {
           const jobsRes = await api.get('/jobs/company/my-jobs');
@@ -71,8 +81,10 @@ const ReviewApplicantsPage = () => {
           if (jobs.length > 0) {
             setJobTitle('All Candidates');
             const appsArrays = await Promise.all(
-              jobs.slice(0, 5).map((j: any) =>
-                api.get(`/applications/job/${j.id}`).then((r) => r.data.data ?? []),
+              jobs.slice(0, 5).map((j: { id: string; title: string }) =>
+                api.get(`/applications/job/${j.id}`).then((r) =>
+                  (r.data.data ?? []).map((a: Applicant) => ({ ...a, jobTitle: j.title })),
+                ),
               ),
             );
             appsData = appsArrays.flat();
@@ -110,6 +122,8 @@ const ReviewApplicantsPage = () => {
       if (filter === 'TOP') return score !== undefined && score >= 85;
       if (filter === 'REVIEW') return a.status === 'PENDING';
       if (filter === 'SHORTLISTED') return a.status === 'SHORTLISTED';
+      if (filter === 'SELECTED') return a.status === 'ACCEPTED';
+      if (filter === 'DECLINED') return a.status === 'REJECTED';
       return true;
     })
     .sort((a, b) => {
@@ -146,6 +160,8 @@ const ReviewApplicantsPage = () => {
     { key: 'TOP', label: 'Top Matches', count: highMatches },
     { key: 'REVIEW', label: 'Under Review', count: applicants.filter((a) => a.status === 'PENDING').length },
     { key: 'SHORTLISTED', label: 'Shortlisted', count: shortlistedCount },
+    { key: 'SELECTED', label: 'Selected', count: applicants.filter((a) => a.status === 'ACCEPTED').length },
+    { key: 'DECLINED', label: 'Not selected', count: applicants.filter((a) => a.status === 'REJECTED').length },
   ];
 
   const avatarColors = [
@@ -154,10 +170,10 @@ const ReviewApplicantsPage = () => {
 
   const handleExport = () => {
     const csv = [
-      'Name,University,Course,Skills,Status,Applied At',
+      'Name,Email,University,Course,Skills,Status,Applied At',
       ...filteredApplicants.map((app) => {
         const p = app.student.studentProfile;
-        return `${p?.firstName} ${p?.lastName},${p?.university ?? ''},${p?.courseOfStudy ?? ''},"${(p?.skills ?? []).join(', ')}",${app.status},${new Date(app.appliedAt).toLocaleDateString()}`;
+        return `${p?.firstName} ${p?.lastName},${app.student.email},${p?.university ?? ''},${p?.courseOfStudy ?? ''},"${(p?.skills ?? []).join(', ')}",${getStatusLabel(app.status)},${new Date(app.appliedAt).toLocaleDateString()}`;
       }),
     ].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -251,8 +267,7 @@ const ReviewApplicantsPage = () => {
               const score = entry.data?.score;
               const scoreStyle = score !== undefined ? getMatchStyle(score) : null;
               const color = avatarColors[i % avatarColors.length];
-              const isShortlisted = app.status === 'SHORTLISTED';
-              const isRejected = app.status === 'REJECTED';
+              const studentName = `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim();
 
               return (
                 <div key={app.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -280,6 +295,12 @@ const ReviewApplicantsPage = () => {
                             {profile?.yearOfStudy ? ` • Year ${profile.yearOfStudy}` : ''}
                             {profile?.courseOfStudy ? ` • ${profile.courseOfStudy}` : ''}
                           </p>
+                          <a
+                            href={`mailto:${app.student.email}`}
+                            className="text-xs text-navy hover:underline flex items-center gap-1 mb-2">
+                            <Mail className="w-3.5 h-3.5 text-gray-400" />
+                            {app.student.email}
+                          </a>
                           <div className="flex flex-wrap gap-1.5">
                             {(profile?.skills ?? []).slice(0, 3).map((skill) => (
                               <span key={skill} className="bg-gray-100 text-gray-600 text-[10px] font-medium px-2 py-0.5 rounded-full">
@@ -335,37 +356,18 @@ const ReviewApplicantsPage = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    {isShortlisted ? (
-                      <div className="flex items-center gap-2 bg-teal-light text-teal-dark text-sm font-semibold px-4 py-2.5 rounded-xl">
-                        <Check className="w-4 h-4 text-teal" /> Shortlisted
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleAction(app.id, 'SHORTLISTED')}
-                        disabled={updatingId === app.id || isRejected}
-                        className="bg-navy text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-navy-light transition-colors disabled:opacity-50">
-                        {updatingId === app.id ? '...' : 'Shortlist'}
-                      </button>
-                    )}
-
-                    {!isRejected && !isShortlisted && (
-                      <button
-                        onClick={() => handleAction(app.id, 'REJECTED')}
-                        disabled={updatingId === app.id}
-                        className="border border-red-200 text-red-500 text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-red-50 transition-colors disabled:opacity-50">
-                        Reject
-                      </button>
-                    )}
-
-                    {isRejected && (
-                      <div className="flex items-center gap-2 bg-red-50 text-red-400 text-sm font-semibold px-4 py-2.5 rounded-xl">
-                        Rejected
-                      </div>
-                    )}
-
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ApplicantActions
+                      status={app.status}
+                      busy={updatingId === app.id}
+                      studentName={studentName}
+                      email={app.student.email}
+                      jobTitle={app.jobTitle}
+                      companyName={companyName}
+                      onChange={(status) => handleAction(app.id, status)}
+                    />
                     <button
-                      onClick={() => navigate(`/students/${app.student.id}`)}
+                      onClick={() => navigate(`/applicants/${app.id}`)}
                       className="ml-auto border border-gray-200 text-navy text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
                       View Profile
                     </button>

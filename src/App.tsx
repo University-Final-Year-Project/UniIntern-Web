@@ -31,6 +31,7 @@ import ReviewApplicantsPage from './pages/company/ReviewApplicantsPage';
 import CompanyProfilePage from './pages/company/CompanyProfilePage';
 import CompanyLayout from './components/common/CompanyLayout';
 import CompanyDashboardPage from './pages/company/CompanyDashboardPage';
+import ApplicantProfilePage from './pages/company/ApplicantProfilePage';
 
 // Admin pages
 import AdminLayout from './components/common/AdminLayout';
@@ -96,6 +97,7 @@ function App() {
           <Route path="/jobs/:jobId/edit" element={<EditJobPage />} />
           <Route path="/candidates" element={<ReviewApplicantsPage />} />
           <Route path="/jobs/:jobId/applicants" element={<ReviewApplicantsPage />} />
+          <Route path="/applicants/:applicationId" element={<ApplicantProfilePage />} />
           <Route path="/settings" element={<CompanyProfilePage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Route>
