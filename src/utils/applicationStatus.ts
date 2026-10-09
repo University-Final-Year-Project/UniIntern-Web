@@ -28,14 +28,8 @@ interface MailInput {
   companyName: string;
 }
 
-// Opens the company's own email app with a ready to edit message.
-export const buildStudentMailto = ({
-  email,
-  status,
-  studentName,
-  jobTitle,
-  companyName,
-}: MailInput): string => {
+// The subject and body for the email, depending on the decision.
+const buildMessage = ({ status, studentName, jobTitle, companyName }: MailInput) => {
   const name = studentName.trim() || 'there';
   const role = jobTitle.trim() || 'the internship';
   let subject: string;
@@ -63,5 +57,24 @@ export const buildStudentMailto = ({
     body = `Dear ${name},\n\nThank you for applying for the ${role} internship at ${companyName}.\n\n\nKind regards,\n${companyName}`;
   }
 
-  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return { subject, body };
+};
+
+// Opens the computer's own mail app (Outlook, Mail and so on) with the message filled in.
+export const buildStudentMailto = (input: MailInput): string => {
+  const { subject, body } = buildMessage(input);
+  return `mailto:${input.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+};
+
+// Opens a new Gmail message in the browser with the message filled in.
+export const buildGmailLink = (input: MailInput): string => {
+  const { subject, body } = buildMessage(input);
+  const params = new URLSearchParams({
+    view: 'cm',
+    fs: '1',
+    to: input.email,
+    su: subject,
+    body,
+  });
+  return `https://mail.google.com/mail/?${params.toString()}`;
 };

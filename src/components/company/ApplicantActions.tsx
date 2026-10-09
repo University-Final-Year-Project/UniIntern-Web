@@ -1,5 +1,5 @@
 import { Check, Mail, X } from 'lucide-react';
-import { buildStudentMailto, getStatusLabel } from '../../utils/applicationStatus';
+import { buildGmailLink, buildStudentMailto, getStatusLabel } from '../../utils/applicationStatus';
 
 interface ApplicantActionsProps {
   status: string;
@@ -35,15 +35,11 @@ const ApplicantActions = ({
     if (window.confirm(message)) onChange(next);
   };
 
-  const mailto = email
-    ? buildStudentMailto({
-        email,
-        status,
-        studentName,
-        jobTitle: jobTitle ?? '',
-        companyName,
-      })
+  const mailInput = email
+    ? { email, status, studentName, jobTitle: jobTitle ?? '', companyName }
     : null;
+  const gmailLink = mailInput ? buildGmailLink(mailInput) : null;
+  const mailto = mailInput ? buildStudentMailto(mailInput) : null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -91,12 +87,21 @@ const ApplicantActions = ({
         </div>
       )}
 
-      {!isOpen && mailto && (
-        <a
-          href={mailto}
-          className="flex items-center gap-2 border border-gray-200 text-navy text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
-          <Mail className="w-4 h-4" /> Email student
-        </a>
+      {!isOpen && gmailLink && (
+        <div className="flex items-center gap-2">
+          <a
+            href={gmailLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 border border-gray-200 text-navy text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+            <Mail className="w-4 h-4" /> Email student
+          </a>
+          <a
+            href={mailto ?? undefined}
+            className="text-xs font-semibold text-gray-400 hover:text-navy underline underline-offset-2 transition-colors">
+            Use mail app
+          </a>
+        </div>
       )}
 
       {!isOpen && (
