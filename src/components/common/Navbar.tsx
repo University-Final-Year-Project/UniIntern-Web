@@ -28,9 +28,11 @@ const Navbar = ({ sidebarCollapsed }: { sidebarCollapsed?: boolean }) => {  cons
             Browse Jobs
           </Link>
             )}
-          <a href="#about" className="text-sm text-gray-600 hover:text-navy transition-colors">
-            About
-          </a>
+          {!user && (
+            <a href="#about" className="text-sm text-gray-600 hover:text-navy transition-colors">
+              About
+            </a>
+          )}
         </div>
 
         {/* Right side */}

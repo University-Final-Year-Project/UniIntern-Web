@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { useJobScores } from '../../hooks/useMatchScores';
 import MatchBadge from '../../components/common/MatchBadge';
+import ApplicationCalendar from '../../components/student/ApplicationCalendar';
 import { type Job, type Application } from '../../types';
 
 
@@ -25,14 +26,6 @@ const STATUS_COLORS: Record<string, string> = {
   ACCEPTED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
   REJECTED: 'bg-gray-100 text-gray-600 border-gray-200/60',
 };
-
-const HEATMAP_COLORS = [
-  'bg-gray-100',
-  'bg-blue-100',
-  'bg-blue-300',
-  'bg-blue-500',
-  'bg-navy',
-];
 
 const StudentDashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -124,28 +117,6 @@ const StudentDashboardPage: React.FC = () => {
     if (profile.biography?.trim() || profile.bio?.trim()) score += 20;
     return score;
   }, [profile]);
-
-  const heatmap = useMemo(() => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return Array.from({ length: 28 }, (_, i) => {
-    const day = new Date(today);
-    day.setDate(today.getDate() - (27 - i));
-
-    const count = applications.filter((app) => {
-      const applied = new Date(app.appliedAt);
-      applied.setHours(0, 0, 0, 0);
-      return applied.getTime() === day.getTime();
-    }).length;
-
-    if (count === 0) return 0;
-    if (count === 1) return 1;
-    if (count === 2) return 2;
-    if (count === 3) return 3;
-    return 4;
-  });
-}, [applications]);
 
   if (isLoading) {
     return (
@@ -455,56 +426,8 @@ const StudentDashboardPage: React.FC = () => {
               </div>
             </section>
 
-            {/* Search Activity Visualizer */}
-            <section className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-sm">
-              <h2 className="text-base font-bold text-navy mb-0.5">Search Intensity</h2>
-              <p className="text-xs text-gray-400 mb-4">Application submission frequency</p>
-
-              <div className="grid grid-cols-7 gap-1.5 mb-3">
-                {heatmap.map((level, i) => {
-                  const day = new Date();
-                  day.setHours(0, 0, 0, 0);
-                  day.setDate(day.getDate() - (27 - i));
-                  const dateLabel = day.toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                  });
-                  const count = applications.filter((app) => {
-                    const applied = new Date(app.appliedAt);
-                    applied.setHours(0, 0, 0, 0);
-                    return applied.getTime() === day.getTime();
-                  }).length;
-
-                  return (
-                    <div key={i} className="relative group">
-                      <div
-                        className={`w-full aspect-square rounded-md transition-colors cursor-pointer ${HEATMAP_COLORS[level]}`}
-                      />
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-10 hidden group-hover:block pointer-events-none">
-                        <div className="bg-navy text-white text-[10px] font-medium px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
-                          {count === 0 ? 'No applications' : `${count} application${count > 1 ? 's' : ''}`}
-                          <br />
-                          <span className="text-white/60">{dateLabel}</span>
-                        </div>
-                        <div className="w-2 h-2 bg-navy rotate-45 mx-auto -mt-1" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
-                <span>Low Activity</span>
-                <div className="flex gap-1">
-                  {HEATMAP_COLORS.map((color, idx) => (
-                    <div key={idx} className={`w-2.5 h-2.5 rounded-sm ${color}`} />
-                  ))}
-                </div>
-                <span>High Activity</span>
-              </div>
-            </section>
+            {/* Application calendar */}
+            <ApplicationCalendar applications={applications} />
 
           </div>
         </div>
